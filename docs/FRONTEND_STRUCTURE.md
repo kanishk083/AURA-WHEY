@@ -1,122 +1,68 @@
 # Aura Whey frontend structure
 
-## Current architecture
-
-The storefront is a vanilla JavaScript single-page application.
-
-- `index.html` is the static application entry point.
-- `app.js` owns application state, hash routing, shared layout, page renderers, carousel behavior, and form actions.
-- `styles.css` contains the complete global design system and responsive styles.
-- Product and Stitch reference assets are maintained alongside the project files.
-
-The current runtime remains unchanged. This document defines the professional module structure to use for a future refactor.
-
-## Recommended target structure
+The storefront remains a vanilla JavaScript hash-routed SPA. The entry point is intentionally small; visual sections, reusable markup, page content, and static data now live in focused modules.
 
 ```text
 .
-├── index.html
-├── src/
-│   ├── main.js                         # Browser entry point; starts the app
-│   ├── app.js                          # Thin app composition and route rendering
-│   ├── data/
-│   │   ├── hero-slides.js              # Hero banner image and copy configuration
-│   │   ├── navigation.js               # Header and footer navigation data
-│   │   ├── products.js                 # Product, flavour, price, and nutrition data
-│   │   ├── documents.js                # Certification and quality-document data
-│   │   ├── faqs.js                     # FAQ content
-│   │   └── posts.js                    # Journal/article metadata
-│   ├── state/
-│   │   ├── store.js                    # Shared cart, flavour, coupon, and theme state
-│   │   └── actions.js                  # State transitions and action handlers
-│   ├── routes/
-│   │   ├── router.js                   # Hash route parsing and navigation
-│   │   └── routes.js                   # Route-to-page component map
-│   ├── components/
-│   │   ├── layout/
-│   │   │   ├── Header.js               # Offer bar, navigation, utility controls
-│   │   │   ├── MobileMenu.js           # Responsive navigation drawer
-│   │   │   └── Footer.js               # Shared footer
-│   │   ├── hero/
-│   │   │   ├── HeroCarousel.js         # Autoplay, buttons, indicators, swipe handling
-│   │   │   └── HeroSlide.js            # One accessible image banner
-│   │   ├── sections/
-│   │   │   ├── ProductHighlights.js    # Homepage product cards
-│   │   │   ├── NutritionSnapshot.js    # Homepage nutrition metrics
-│   │   │   ├── RoutineSection.js       # Homepage routine / why-Aura section
-│   │   │   ├── QualityPreview.js       # Homepage quality and certification preview
-│   │   │   ├── PackVerification.js     # Homepage pack/document preview
-│   │   │   ├── JournalPreview.js       # Homepage journal preview
-│   │   │   └── FaqPreview.js           # Homepage FAQ preview
-│   │   └── ui/
-│   │       ├── Button.js               # Shared button variants
-│   │       ├── Icon.js                 # Inline SVG icon registry
-│   │       ├── ProductCard.js          # Reusable flavour/product card
-│   │       ├── DocumentCard.js         # Reusable certificate card
-│   │       ├── Accordion.js            # Accessible FAQ accordion
-│   │       ├── CouponForm.js           # Reusable coupon input and result
-│   │       └── Toast.js                # Shared transient status message
-│   ├── pages/
-│   │   ├── HomePage.js                 # Composes homepage sections only
-│   │   ├── ProductPage.js
-│   │   ├── CartPage.js
-│   │   ├── CheckoutPage.js
-│   │   ├── QualityPage.js
-│   │   ├── BlogPage.js
-│   │   ├── ArticlePage.js
-│   │   ├── AuthenticatePage.js
-│   │   ├── TrackOrderPage.js
-│   │   ├── FaqPage.js
-│   │   ├── ContactPage.js
-│   │   ├── SearchPage.js
-│   │   ├── AccountPage.js
-│   │   ├── PolicyPage.js
-│   │   └── DocumentPage.js
-│   ├── utils/
-│   │   ├── dom.js                     # Small DOM/render helpers
-│   │   ├── currency.js                # INR formatting helpers
-│   │   └── accessibility.js           # Focus and reduced-motion helpers
-│   └── styles/
-│       ├── tokens.css                 # Colours, fonts, spacing, radii, breakpoints
-│       ├── base.css                   # Reset and base element rules
-│       ├── layout.css                 # Header, grid, page, and footer layout
-│       ├── components.css             # Reusable UI component styles
-│       └── pages.css                  # Page- and section-specific styles
-├── assets/
-│   ├── products/
-│   ├── quality/
-│   └── hero/
-└── docs/
-    └── FRONTEND_STRUCTURE.md
+|-- index.html                         # Static document shell
+|-- app.js                             # Browser module bridge
+|-- styles.css                         # Existing global visual system
+|-- src/
+|   |-- main.js                        # Starts the application
+|   |-- app.js                         # Root composition and event delegation
+|   |-- components/
+|   |   |-- hero/
+|   |   |   |-- HeroCarousel.js        # Autoplay, arrows, dots, swipe, motion preference
+|   |   |   `-- HeroSlide.js           # One responsive hero banner
+|   |   |-- layout/
+|   |   |   |-- Header.js
+|   |   |   |-- MobileMenu.js
+|   |   |   `-- Footer.js
+|   |   |-- sections/
+|   |   |   |-- ProductHighlights.js
+|   |   |   |-- NutritionSnapshot.js
+|   |   |   |-- RoutineSection.js
+|   |   |   |-- QualityPreview.js
+|   |   |   |-- PackVerification.js
+|   |   |   |-- JournalPreview.js
+|   |   |   `-- FaqPreview.js
+|   |   `-- ui/
+|   |       |-- Accordion.js
+|   |       |-- BlogCard.js
+|   |       |-- CouponForm.js
+|   |       |-- ProductCard.js
+|   |       |-- icons.js
+|   |       `-- render.js
+|   |-- data/
+|   |   |-- catalog.js                 # Products, links, documents, FAQs, journal data
+|   |   `-- hero-slides.js             # Replace hero artwork here only
+|   |-- pages/
+|   |   |-- HomePage.js
+|   |   `-- StorePages.js               # Remaining route page renderers
+|   |-- routes/
+|   |   `-- router.js                  # Hash route parsing and navigation
+|   `-- state/
+|       `-- store.js                   # Cart, coupon, theme, selection state
+`-- docs/
+    `-- FRONTEND_STRUCTURE.md
 ```
 
-## Module boundaries
+## Module ownership
 
-| Concern | Owns | Must not own |
-| --- | --- | --- |
-| `app.js` | Root render composition and lifecycle wiring | Page markup, data, business transitions |
-| `pages/` | Page-level composition | Shared header, footer, or reusable cards |
-| `components/layout/` | Global shell UI | Route-specific content |
-| `components/sections/` | Homepage section markup | Cross-page state mutations |
-| `components/ui/` | Reusable presentational patterns | Route decisions |
-| `data/` | Static display data | DOM mutations or event listeners |
-| `state/` | State and transitions | Markup or CSS decisions |
-| `routes/` | URL-to-page resolution | Shared visual components |
+| Area | Responsibility |
+| --- | --- |
+| `src/app.js` | Application shell, route selection, and delegated interaction handlers. |
+| `components/layout` | Shared header, mobile navigation, and footer markup. |
+| `components/hero` | Responsive carousel behavior independent of content. |
+| `components/sections` | Homepage sections, kept in their existing visual order. |
+| `components/ui` | Reusable cards, controls, icons, and markup helpers. |
+| `data` | Static storefront content. Update `hero-slides.js` to swap banner artwork. |
+| `pages` | Page-level composition for each existing hash route. |
+| `state` and `routes` | Existing storefront state and URL behavior. |
 
-## Safe refactor order
+## Refactor invariants
 
-1. Move immutable data out of `app.js` with no markup changes.
-2. Extract `Icon`, `Button`, and link/render helpers.
-3. Extract `Header`, mobile menu, and `Footer` without changing their output.
-4. Extract the hero carousel into `HeroCarousel` and move slide data into `data/hero-slides.js`.
-5. Extract homepage sections one at a time, preserving their exact DOM classes and order.
-6. Extract route pages, then reduce `app.js` to composition, router setup, and subscriptions.
-7. Split global CSS by responsibility only after component markup is stable.
-
-## Invariants for the refactor
-
-- Keep the current hash routes and route names.
-- Preserve the cart, coupon, quantity, theme, FAQ, authentication, tracking, and carousel behavior.
-- Preserve all current CSS class names during the initial extraction pass so the visual output does not change.
-- Do not introduce React, a build tool, or a UI framework unless the project explicitly adopts one.
-- Keep hero images replaceable by editing only `data/hero-slides.js` after extraction.
+- Existing design, styles, copy, routes, and customer flows remain intact.
+- `app.js` stays a thin bootstrap; `src/app.js` does not contain page or section markup.
+- Hero images use the slide data file, with `mobileImage` falling back to `desktopImage`.
+- No framework or build tool was introduced.
