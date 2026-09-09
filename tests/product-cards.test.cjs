@@ -9,14 +9,38 @@ const source = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 
 // Run the actual storefront templates and actions without starting its DOM lifecycle.
 function storefront() {
+  const events = {};
   const context = vm.createContext({
     document: { querySelector: () => null, readyState: 'loading', addEventListener() {} },
-    window: { addEventListener() {} },
+    window: { addEventListener(name, handler) { events[name] = handler; } },
     localStorage: { getItem: () => null },
     location: { hash: '#/home' }
   });
   vm.runInContext(source, context);
-  return { context, run: code => vm.runInContext(code, context) };
+  return { context, events, run: code => vm.runInContext(code, context) };
+}
+
+for (const flavour of ['Mawa Kulfi', 'Rich Chocolate']) {
+  test(`${flavour}: navigation resets homepage scroll after rendering the selected product`, () => {
+    const { context, events, run } = storefront();
+    let rendered = '';
+    let scrollTop = 1200;
+    context.captureRender = html => { rendered = html; };
+    run('render = () => captureRender(shop())');
+    context.window.scrollTo = options => {
+      assert.ok(rendered.includes(`Aura Whey <span>${flavour}</span>`));
+      assert.equal(options.behavior, 'instant');
+      assert.equal(options.left, 0);
+      scrollTop = options.top;
+    };
+    run(`handleAction('select-${flavour}')`);
+    assert.equal(run('location.hash'), '/shop');
+    events.hashchange();
+    assert.equal(scrollTop, 0);
+    scrollTop = 500;
+    run('render()');
+    assert.equal(scrollTop, 500, 'in-page renders preserve scroll position');
+  });
 }
 
 for (const [flavour, theme] of [['Mawa Kulfi', 'flavour-kulfi'], ['Rich Chocolate', 'flavour-chocolate']]) {

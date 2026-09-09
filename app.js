@@ -18,7 +18,7 @@ const assets = {
   mawa: './assets/MK%20Card/Malai%20Kulfi%201.1.png',
   duo: `${assetBase}chatgpt_image_aug_15_2026_02_33_29_pm.png/screen.png`,
   labelMawa: `${assetBase}whatsapp_image_2026_07_22_at_21.31.00.jpeg/screen.png`,
-  why: `${assetBase}chatgpt_image_sep_4_2026_07_09_56_pm.png/screen.png`
+  why: './assets/image.png'
 };
 
 const productFlavours = {
@@ -148,7 +148,7 @@ function shell(content) {
             ${brand()}
             <nav class="desktop-nav" aria-label="Primary navigation">${nav}</nav>
             <div class="header-actions">
-              ${iconLink('search', 'search', 'Search', 'hide-mobile')}
+              <button type="button" class="icon-button" data-action="open-search" aria-label="Search products" aria-haspopup="dialog">${icon('search')}</button>
               ${iconLink('account', 'account', 'Sign in or log in')}
               ${routeLink('cart', `${icon('bag')}<span class="cart-count" aria-label="${state.cart} items in cart">${state.cart}</span><span class="sr-only">Cart</span>`, 'icon-button cart-link')}
               <button class="icon-button theme-toggle" type="button" data-action="toggle-theme" aria-label="${themeLabel}" title="${themeLabel}">${icon(themeIcon)}</button>
@@ -160,15 +160,11 @@ function shell(content) {
       <div class="overlay" data-action="close-menu"></div>
       <aside class="mobile-panel" aria-label="Mobile navigation">
         <div class="mobile-panel-top">${brand()}<button class="icon-button menu-close" type="button" data-action="close-menu" aria-label="Close menu">${icon('close')}</button></div>
-        <form class="mobile-search" data-form="search" data-mobile-search="true">
-          <label class="sr-only" for="mobile-search-input">Search the store</label>
-          <input id="mobile-search-input" name="query" placeholder="Search products and guides" value="${state.searchQuery}" />
-          <button type="submit" aria-label="Search">${icon('search')}</button>
-        </form>
+        <button type="button" class="mobile-search-trigger" data-action="open-search">${icon('search')} Search products</button>
         <nav>${nav}${routeLink('account', 'Sign in / Log in')}${routeLink('cart', `Cart <span class="cart-count">${state.cart}</span>`)}</nav>
         <div class="mobile-theme"><span>Appearance</span><button type="button" class="text-button" data-action="toggle-theme">${state.theme === 'dark' ? 'Light mode' : 'Dark mode'}</button></div>
       </aside>
-      <main tabindex="-1">${content}</main>
+      <main tabindex="-1">${content}${shopInvitation()}${storeFaq()}</main>
       <footer class="footer">
         <div class="footer-grid">
           <div class="footer-intro">${brand()}<p>Whey protein in Mawa Kulfi and Rich Chocolate flavours. Built around the routine, not the noise.</p></div>
@@ -178,6 +174,7 @@ function shell(content) {
         </div>
         <div class="footer-bottom"><div class="footer-socials" aria-label="Social links"><a href="#" aria-label="Facebook">${icon('facebook')}</a><a href="#" aria-label="Instagram">${icon('instagram')}</a><a href="#" aria-label="LinkedIn">${icon('linkedin')}</a><a href="#" aria-label="YouTube">${icon('youtube')}</a></div><span>© 2026 Aura Whey</span></div>
       </footer>
+      ${searchDialog()}
     </div>`;
 }
 
@@ -222,23 +219,53 @@ function home() {
   return `
     ${heroBannerCarousel()}
     <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Pick your flavour</h2><div class="gold-rule"></div></div><p>Choose the flavour that fits the ritual you want to repeat.</p></div><div class="grid product-grid">${productCard('Mawa Kulfi')}${productCard('Rich Chocolate')}</div></div></section>
-    <section class="section nutrition-section"><div class="section-inner"><div class="section-head"><div><h2>What’s in a serving</h2><div class="gold-rule"></div></div><p>Clear product information, right where you need it.</p></div><div class="stats"><div><span class="stat-value">24g</span>Protein per serving</div><div><span class="stat-value">5.7g</span>BCAAs per serving</div><div><span class="stat-value">35g</span>Serving size</div><div><span class="stat-value">28</span>Servings per pack</div></div></div></section>
-    <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Made for the routine</h2><div class="gold-rule"></div></div><p>Simple product details. Familiar flavours. A dependable post-training choice.</p></div><div class="image-section">${image(assets.why, 'Aura Whey product and key details')}</div></div></section>
-    <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Quality, on record</h2><div class="gold-rule"></div></div><p>Review the facility and food-safety documents before you buy.</p></div><div class="trust-grid"><div class="trust-item"><strong>FSSAI licensed</strong><span>Licence no. 10724997000182</span></div><div class="trust-item"><strong>ISO 22000</strong><span>Food safety management system</span></div><div class="trust-item"><strong>GMP</strong><span>Good manufacturing practice</span></div><div class="trust-item"><strong>HACCP</strong><span>Hazard control process</span></div></div><p class="button-row">${routeLink('quality', 'View quality documents', 'button-link secondary')}</p></div></section>
+    <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Made for the routine</h2><div class="gold-rule"></div></div><p>Simple product details. Familiar flavours. A dependable post-training choice.</p></div><div class="image-section">${routeLink('shop', image(assets.why, 'Aura Whey athlete campaign with Mawa Kulfi and Rich Chocolate'), 'routine-banner-link')}</div><p class="button-row">${routeLink('shop', 'Shop now', 'button-link primary')}${routeLink('article/plan-your-protein-routine', 'Build your routine', 'button-link secondary')}</p></div></section>
     <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Know your pack</h2><div class="gold-rule"></div></div><p>Read the nutrition panel, check the documents, then verify your product code.</p></div><div class="grid grid-2"><div class="card label-card">${image(assets.labelMawa, 'Aura Whey Mawa Kulfi nutrition label', 'label-preview')}</div><div class="quality-cta"><h3>Quality documents and product authentication</h3><p>Our quality library keeps the supplied certification documents in one place. Use the pack code to confirm your purchase.</p><div class="button-row">${routeLink('quality', 'Open quality library', 'button-link primary')}${routeLink('authenticate', 'Authenticate a pack', 'button-link')}</div></div></div></div></section>
     <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Better-informed training</h2><div class="gold-rule"></div></div><p>Practical guides for choosing, using, and enjoying your whey protein.</p></div><div class="grid grid-3">${blogCard(0)}${blogCard(1)}${blogCard(2)}</div><p>${routeLink('blog', 'Browse the journal', 'button-link secondary')}</p></div></section>
-    <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Before you order</h2><div class="gold-rule"></div></div><p>The quick answers customers look for most.</p></div>${faqItems(true)}<p>${routeLink('faq', 'Read all FAQs', 'button-link secondary')}</p></div></section>`;
+    ${nutritionTrust()}`;
 }
 
 const posts = [
-  { title: 'How to choose a whey protein flavour', excerpt: 'Start with the taste you will genuinely look forward to using.', image: assets.duo },
-  { title: 'A simple way to plan your protein routine', excerpt: 'Build a repeatable food and training routine around your day.', image: assets.why },
-  { title: 'Mawa Kulfi or Rich Chocolate?', excerpt: 'Two different flavour profiles, one straightforward choice.', image: assets.chocolate }
+  {
+    slug: 'choose-your-flavour',
+    title: 'How to choose a whey protein flavour',
+    excerpt: 'Creamy and familiar or deep and chocolatey? Find a flavour that fits your everyday shake.',
+    image: './assets/BLOG/BLOG-1.png',
+    alt: 'Kulfi-inspired and chocolate shakes on a warm stone counter',
+    sections: [
+      ['Start with what you enjoy', 'Think about the flavours you already reach for. If traditional Indian desserts are your thing, Mawa Kulfi brings a creamy, dessert-inspired character. If you usually choose chocolate, Rich Chocolate offers a familiar cocoa profile. Your everyday shake should be something you look forward to.'],
+      ['Keep the first shake simple', 'Prepare your first serving according to the pack directions before adding fruit, coffee or other extras. That gives you a clear sense of the flavour on its own. Use the same preparation when comparing flavours, so you can decide which one you prefer.'],
+      ['Read beyond the flavour name', 'Taste is only one part of the choice. Check the ingredient list, allergen information, serving size and storage directions on the actual pack. Flavour photography is inspiration for serving, so use the label to understand what is inside. Pick the option that suits both your preferences and your routine.']
+    ]
+  },
+  {
+    slug: 'plan-your-protein-routine',
+    title: 'A simple way to plan your protein routine',
+    excerpt: 'A ready shaker, a familiar time and less daily guesswork. Make your routine easier to repeat.',
+    image: './assets/BLOG/BLOG-2.png',
+    alt: 'Black and gold shaker beside a towel, scoop and training notebook',
+    sections: [
+      ['Choose a moment that fits', 'Start with your real schedule. Decide when preparing a shake is convenient, whether that is at home before heading out or after returning from training. Choose a moment you can repeat without rushing. The aim is to make preparation easy to remember.'],
+      ['Get the basics ready', 'Keep your shaker clean, dry and easy to find. Read the mixing directions and serving size on your pack before preparing it, and follow the storage instructions between uses. A little preparation means fewer things to organise when your day gets busy.'],
+      ['Keep it practical', 'Use a simple note to record what you enjoyed and what felt inconvenient: the flavour, your preparation or the time you chose. Adjust one thing at a time. Keep regular meals in your plan and treat the shake as an addition to your day. Build a routine around what you can comfortably maintain.']
+    ]
+  },
+  {
+    slug: 'mawa-kulfi-or-rich-chocolate',
+    title: 'Mawa Kulfi or Rich Chocolate?',
+    excerpt: 'Discover the creamy kulfi-inspired character and classic cocoa flavour behind our two favourites.',
+    image: './assets/BLOG/BLOG-3.png',
+    alt: 'Aura Whey Mawa Kulfi and Rich Chocolate tubs side by side',
+    sections: [
+      ['Mawa Kulfi: a familiar twist', 'Mawa Kulfi takes its flavour inspiration from a much-loved Indian dessert. Its creamy character makes it a choice to consider if you want something different from the usual chocolate shake. Think of it as a little familiarity in your everyday routine, with the convenience of whey protein.'],
+      ['Rich Chocolate: the classic choice', 'Rich Chocolate is for anyone who naturally reaches for cocoa flavours. It keeps the choice straightforward: a chocolate-led shake with a familiar flavour profile. If chocolate is already your first pick when choosing a drink or dessert, this is a natural place to start.'],
+      ['Let your preference decide', 'Neither flavour needs to win for everyone. Choose the one you would most enjoy preparing again tomorrow. Check each pack for its own ingredients, nutrition and allergen details rather than assuming the flavours are identical. Follow the mixing directions for your first serving, then decide which belongs in your routine.']
+    ]
+  }
 ];
-
 function blogCard(index) {
   const post = posts[index % posts.length];
-  return `<article class="card blog-card"><div class="blog-image">${image(post.image, post.title)}</div><div class="blog-card-copy"><h3>${post.title}</h3><p>${post.excerpt}</p>${routeLink('article', 'Read guide', 'text-link')}</div></article>`;
+  return `<article class="card blog-card"><div class="blog-image">${image(post.image, post.alt)}</div><div class="blog-card-copy"><h3>${post.title}</h3><p>${post.excerpt}</p>${routeLink(`article/${post.slug}`, 'Read guide', 'text-link')}</div></article>`;
 }
 
 function productCard(flavour) {
@@ -261,13 +288,78 @@ function couponEntry() {
   return `<form class="coupon-form" data-form="coupon"><label class="field">Coupon code<input name="coupon" value="${state.coupon}" placeholder="Enter coupon code" /></label><button type="submit" class="button">Apply</button></form><div class="coupon-result" aria-live="polite">${result}</div>`;
 }
 
+function productInside() {
+  return `<div class="product-inside">
+    <div class="purchase-notes">${routeLink('policy', 'Shipping & delivery')}${routeLink('policy', 'Returns & replacement policy')}</div>
+    <p class="inside-intro">Your everyday whey, with a flavour worth coming back for. Get to know your ${state.flavour} serving.</p>
+    <h3>What's inside?</h3>
+    <div class="inside-serving"><span class="serving-number">24<span>g</span></span><div><strong>Protein in every serving</strong><span>35 g serving · ${state.flavour}</span></div></div>
+    <dl class="inside-breakdown"><div><dt>Protein</dt><dd>24 g</dd></div><div><dt>BCAAs</dt><dd>5.7 g</dd></div><div><dt>Serving size</dt><dd>35 g</dd></div><div><dt>Servings per 1 kg pack</dt><dd>28</dd></div></dl>
+    <p class="inside-caption">Per serving. BCAAs are part of the protein content.</p>
+    <details class="inside-detail"><summary>Nutritional facts<span aria-hidden="true">+</span></summary><div><p>Each 35 g serving provides 24 g protein, including 5.7 g BCAAs. For the full nutrition panel, refer to your flavour's pack label.</p>${state.flavour === 'Mawa Kulfi' ? image(assets.labelMawa, 'Mawa Kulfi full nutrition and ingredient label', 'inside-label') : '<p>Check the Rich Chocolate pack for its complete nutrition and ingredient information.</p>'}</div></details>
+    <details class="inside-detail"><summary>Product details<span aria-hidden="true">+</span></summary><div><dl class="inside-breakdown"><div><dt>Flavour</dt><dd>${state.flavour}</dd></div><div><dt>Net weight</dt><dd>1 kg</dd></div><div><dt>Product</dt><dd>Whey protein</dd></div></dl><p>Refer to the pack for ingredients, allergen advice, mixing directions, storage instructions and the best-before date.</p></div></details>
+    <p class="inside-footnote">Know your pack. Read the label. Find your routine.</p>
+  </div>`;
+}
+
+function nutritionTrust() {
+  return `<section class="section nutrition-trust"><div class="section-inner">
+    <div class="section-head"><div><h2>Know what goes into your routine.</h2><div class="gold-rule"></div></div><p>Nutrition at a glance. Quality information within reach.</p></div>
+    <div class="nutrition-trust-stats"><div><strong>24<span>g</span></strong><p>Protein per serving</p></div><div><strong>5.7<span>g</span></strong><p>BCAAs per serving</p></div><div><strong>35<span>g</span></strong><p>Serving size</p></div><div><strong>28</strong><p>Servings per pack</p></div></div>
+    <div class="certification-heading"><h3>Food safety & manufacturing</h3><p>Explore the certification categories in our quality library.</p></div>
+    <div class="certification-strip">${[['FSSAI', 'Food safety licence'], ['ISO 22000', 'Food safety management'], ['GMP', 'Manufacturing practices'], ['HACCP', 'Hazard control']].map(([name, description]) => `<a class="certification-item" href="#/quality"><span class="certification-symbol" aria-hidden="true">${icon('file')}</span><strong>${name}</strong><span>${description}</span></a>`).join('')}</div>
+    <div class="nutrition-trust-bottom"><p>Read the pack label for full nutrition and ingredient details.</p>${routeLink('quality', 'Explore quality information', 'text-link')}</div>
+  </div></section>`;
+}
+
+function shopInvitation() {
+  return `<section class="section shop-invitation"><div class="section-inner"><div><h2>Find your everyday flavour.</h2><p>Mawa Kulfi or Rich Chocolate. Make it your routine.</p></div><div class="button-row">${routeLink('shop', 'Shop now', 'button-link primary')}${routeLink('article/mawa-kulfi-or-rich-chocolate', 'Compare flavours', 'button-link secondary')}</div></div></section>`;
+}
+
+function productReviews() {
+  return `<section class="section product-reviews"><div class="section-inner"><div class="section-head"><div><h2>Your flavour. Your take.</h2><p>Write a review of Aura Whey ${state.flavour}.</p></div></div><div class="review-layout"><div><h3>Add your review</h3><p>How did it taste? How did it mix? Share the details you would want to know.</p><p class="small">Reviews saved here are private previews in this browser. They are not published or verified purchases.</p></div><form class="form" data-form="review"><label class="field">Your name<input name="reviewName" maxlength="60" required autocomplete="given-name" /></label><fieldset class="review-rating"><legend>Your rating</legend>${[1,2,3,4,5].map(n => `<label><input type="radio" name="rating" value="${n}" required /><span>${n} ★</span></label>`).join('')}</fieldset><label class="field">Your review<textarea name="reviewText" rows="4" minlength="10" maxlength="1000" required placeholder="Tell us about the flavour and your experience"></textarea></label><button type="submit" class="button primary">Save review preview</button><div id="review-result" role="status" aria-live="polite"></div></form></div><div id="review-preview" class="review-preview" hidden></div></div></section>`;
+}
+
+function showSavedReview() {
+  const preview = document.querySelector('#review-preview');
+  if (!preview) return;
+  try {
+    const review = JSON.parse(localStorage.getItem('aura-review-' + state.flavour) || 'null');
+    if (!review || typeof review.name !== 'string' || typeof review.text !== 'string' || !Number.isInteger(review.rating) || review.rating < 1 || review.rating > 5) return;
+    preview.replaceChildren();
+    const heading = document.createElement('strong');
+    heading.textContent = review.name + ' · ' + review.rating + '/5 · Private preview';
+    const body = document.createElement('p');
+    body.textContent = review.text;
+    preview.append(heading, body);
+    preview.hidden = false;
+  } catch { preview.hidden = true; }
+}
+
+function storeFaq() {
+  return `<section class="section store-faq"><div class="section-inner store-faq-layout"><div><h2>Got questions?<br>Let’s dive in.</h2><p>From your first shake to your next order.</p>${routeLink('contact', 'Still have a question? Get in touch', 'text-link')}</div><div>${faqItems()}<p class="faq-sources">General guidance: <a href="https://www.niddk.nih.gov/health-information/digestive-diseases/lactose-intolerance">NIDDK: lactose intolerance</a> and <a href="https://ods.od.nih.gov/factsheets/ExerciseAndAthleticPerformance-Consumer/">NIH: exercise supplements</a>. Your pack label and individual medical advice take priority.</p></div></div></section>`;
+}
+
 function shop() {
-  const tabContent = {
-    Details: 'Aura Whey Protein is supplied in a 1 kg pack with two flavour options: Mawa Kulfi and Rich Chocolate. Choose a flavour, add it to your cart, and complete payment through the Shopify checkout.',
-    Nutrition: 'Per 35 g serving: 24 g protein and 5.7 g BCAAs. One 1 kg pack contains 28 servings. Refer to the pack nutrition panel for the complete information.',
-    Ingredients: 'Refer to the product pack for the ingredients list, allergen advice, storage instructions, and full nutritional information.'
-  };
-  return `<div class="product-page ${productFlavours[state.flavour].theme}"><h1 class="page-title">Aura Whey Protein</h1><div class="product-layout"><section class="product-gallery"><div class="product-main-image">${image(productFlavours[state.flavour].images[state.productImage], `${state.flavour} Aura Whey product`)}</div><div class="thumbnail-row" aria-label="Product images">${productFlavours[state.flavour].images.map((src, index) => `<button type="button" class="thumbnail" data-action="product-image-${index}" aria-label="View ${state.flavour} image ${index + 1}" aria-pressed="${state.productImage === index}">${image(src, `${state.flavour}, image ${index + 1}`)}</button>`).join('')}</div></section><section class="purchase-panel"><p class="breadcrumb">Shop / Whey protein</p><h2>Aura Whey <span>${state.flavour}</span></h2><div class="price">${productPrice}<span>Inclusive of taxes</span></div><p>1 kg · 28 servings · 35 g serving size</p><div class="flavour-picker"><span>Choose flavour</span><div class="button-row"><button type="button" class="flavour ${state.flavour === 'Mawa Kulfi' ? 'active' : ''}" data-action="select-Mawa Kulfi">Mawa Kulfi</button><button type="button" class="flavour ${state.flavour === 'Rich Chocolate' ? 'active' : ''}" data-action="select-Rich Chocolate">Rich Chocolate</button></div></div><div class="coupon-entry">${couponEntry()}</div><div class="product-actions"><div class="button-row">${button('add-cart', 'Add to cart', 'primary', 'bag')}${routeLink('quality', 'View quality documents', 'button-link secondary')}</div></div></section></div><section class="section"><div class="section-inner"><div class="tab-list">${Object.keys(tabContent).map(tab => `<button type="button" class="tab ${state.tab === tab ? 'active' : ''}" data-action="tab-${tab}">${tab}</button>`).join('')}</div><div class="tab-panel">${tabContent[state.tab]}</div></div></section><section class="section"><div class="section-inner"><div class="trust-grid"><div class="trust-item"><strong>Manufacturing</strong><span>GMP-certified facility</span></div><div class="trust-item"><strong>Food safety</strong><span>ISO 22000 and HACCP documents</span></div><div class="trust-item"><strong>Authenticity</strong><span>${routeLink('authenticate', 'Authenticate your pack')}</span></div><div class="trust-item"><strong>Need help?</strong><span>${routeLink('faq', 'Read the FAQs')}</span></div></div></div></section></div>`;
+  return `<div class="product-page ${productFlavours[state.flavour].theme}"><h1 class="page-title">Aura Whey Protein</h1><div class="product-layout"><section class="product-gallery"><div class="product-main-image">${image(productFlavours[state.flavour].images[state.productImage], `${state.flavour} Aura Whey product`)}</div><div class="thumbnail-row" aria-label="Product images">${productFlavours[state.flavour].images.map((src, index) => `<button type="button" class="thumbnail" data-action="product-image-${index}" aria-label="View ${state.flavour} image ${index + 1}" aria-pressed="${state.productImage === index}">${image(src, `${state.flavour}, image ${index + 1}`)}</button>`).join('')}</div></section><section class="purchase-panel"><p class="breadcrumb">Shop / Whey protein</p><h2>Aura Whey <span>${state.flavour}</span></h2><div class="price">${productPrice}<span>Inclusive of taxes</span></div><p>1 kg · 28 servings · 35 g serving size</p><div class="flavour-picker"><span>Choose flavour</span><div class="button-row"><button type="button" class="flavour ${state.flavour === 'Mawa Kulfi' ? 'active' : ''}" data-action="select-Mawa Kulfi">Mawa Kulfi</button><button type="button" class="flavour ${state.flavour === 'Rich Chocolate' ? 'active' : ''}" data-action="select-Rich Chocolate">Rich Chocolate</button></div></div><div class="coupon-entry">${couponEntry()}</div><div class="product-actions">${auraQuantity()}<div class="button-row">${button('add-cart', 'Add to cart', 'primary', 'bag')}${routeLink('quality', 'View quality documents', 'button-link secondary')}</div></div>${productInside()}</section></div>${productReviews()}${nutritionTrust()}</div>`;
+}
+
+function auraQuantity() {
+  return `<div class="aura-quantity" role="group" aria-label="Product quantity"><button type="button" data-action="aura-down" aria-label="Decrease quantity" ${state.quantity === 1 ? 'disabled' : ''}>−</button><output class="aura-quantity-value" aria-live="polite">${state.quantity} AURA</output><button type="button" data-action="aura-up" aria-label="Increase quantity">+</button><div class="aura-bursts" aria-hidden="true"></div></div>`;
+}
+
+function updateAuraQuantity(action, element) {
+  state.quantity = Math.max(1, state.quantity + (action === 'aura-up' ? 1 : -1));
+  const control = element.closest('.aura-quantity');
+  control.querySelector('output').textContent = `${state.quantity} AURA`;
+  control.querySelector('[data-action="aura-down"]').disabled = state.quantity === 1;
+  if (action === 'aura-up') {
+    const burst = document.createElement('span');
+    burst.className = 'aura-burst';
+    burst.textContent = '+1000 AURA';
+    control.querySelector('.aura-bursts').appendChild(burst);
+    burst.addEventListener('animationend', () => burst.remove(), { once: true });
+  }
 }
 
 function totals() {
@@ -298,35 +390,173 @@ const documents = [
 function documentCard([title, type, detail]) { return `<article class="card document-card"><div class="document-icon">${icon('file')}</div><p class="document-type">${type}</p><h3>${title}</h3><p>${detail}</p>${button(`view-document-${title}`, 'View document', 'document-button')}</article>`; }
 
 function quality() {
-  return `<section class="page-intro"><p class="hero-overline">Quality & documentation</p><h1>Quality you can inspect.</h1><p>Browse the supplied food-safety and manufacturing documents, then authenticate the code on your pack.</p></section><section class="section"><div class="section-inner"><div class="section-head"><div><h2>Certificates</h2><div class="gold-rule"></div></div><p>Food safety, manufacturing, and dietary certification documents.</p></div><div class="grid grid-3">${documents.map(documentCard).join('')}</div></div></section><section class="section"><div class="section-inner quality-process"><div class="quality-process-image">${image(assets.labelMawa, 'Aura Whey product nutrition information')}</div><div><h2>Read the pack first.</h2><p>Nutrition, ingredients, allergen advice, and storage guidance are printed on the product label. We keep the supplied certificates alongside it for straightforward review.</p><div class="button-row">${routeLink('authenticate', 'Authenticate your pack', 'button-link primary')}${routeLink('contact', 'Contact support', 'button-link')}</div></div></div></section>`;
+  return `<section class="quality-hero" aria-labelledby="quality-title"><img class="quality-hero-image" src="./assets/lab%20image.png" alt="Illustrative scene of laboratory technicians handling food samples" fetchpriority="high" /><div class="quality-hero-inner"><div class="quality-hero-copy"><p class="hero-overline">Quality & documentation</p><h1 id="quality-title">Quality you can inspect.</h1><p>Explore food-safety and manufacturing information, and learn what to check on your pack.</p></div></div></section><section class="section"><div class="section-inner"><div class="section-head"><div><h2>Certificates</h2><div class="gold-rule"></div></div><p>Food safety, manufacturing, and dietary certification documents.</p></div><div class="grid grid-3">${documents.map(documentCard).join('')}</div></div></section><section class="section"><div class="section-inner quality-process"><div class="quality-process-image">${image(assets.labelMawa, 'Aura Whey product nutrition information')}</div><div><h2>Read the pack first.</h2><p>Nutrition, ingredients, allergen advice, and storage guidance are printed on the product label. We keep the supplied certificates alongside it for straightforward review.</p><div class="button-row">${routeLink('authenticate', 'Authenticate your pack', 'button-link primary')}${routeLink('contact', 'Contact support', 'button-link')}</div></div></div></section>`;
 }
 
-function search() {
-  const query = state.searchQuery.trim();
-  const results = query ? `<div class="search-results"><p>Showing matches for <strong>${query}</strong></p><div class="grid product-grid">${productCard('Mawa Kulfi')}${productCard('Rich Chocolate')}</div></div>` : '<p class="search-help">Search for a product, a quality document, or a journal guide.</p>';
-  return `<section class="page-intro compact"><p class="hero-overline">Search</p><h1>Find what you need.</h1><form class="search-form" data-form="search"><label class="sr-only" for="store-search">Search the store</label><input id="store-search" name="query" value="${query}" placeholder="Search products and guides" />${button('submit-search', 'Search', 'primary', 'search')}</form>${results}</section>`;
+function searchDialog() {
+  return `<dialog id="search-dialog" class="search-dialog" aria-labelledby="search-title"><div class="search-dialog-panel"><div class="search-dialog-heading"><h2 id="search-title">Find your flavour.</h2><button type="button" class="icon-button" data-action="close-search" aria-label="Close search">${icon('close')}</button></div><form class="search-form" data-form="search"><label class="sr-only" for="search-overlay-input">Search products</label><input id="search-overlay-input" name="query" type="search" maxlength="100" placeholder="Try chocolate, kulfi or whey…" autocomplete="off" autofocus /><button type="submit" class="button primary">Search</button></form><p id="search-count" role="status" aria-live="polite"></p><div id="search-products" class="search-product-list"></div></div></dialog>`;
 }
+
+function matchingProducts(query) {
+  const terms = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  return Object.keys(productFlavours).filter(flavour => {
+    const words = ('aura whey protein ' + flavour + (flavour === 'Mawa Kulfi' ? ' malai creamy' : ' cocoa chocolate')).toLowerCase();
+    return terms.every(term => words.includes(term));
+  });
+}
+
+function updateSearchResults() {
+  const input = document.querySelector('#search-overlay-input');
+  state.searchQuery = input.value.slice(0, 100);
+  const matches = matchingProducts(state.searchQuery);
+  document.querySelector('#search-count').textContent = matches.length ? (state.searchQuery.trim() ? matches.length + ' matching product' + (matches.length === 1 ? '' : 's') : 'Explore both flavours') : 'No products found. Try “whey”, “kulfi” or “chocolate”.';
+  document.querySelector('#search-products').innerHTML = matches.map(flavour => `<button type="button" class="search-product ${productFlavours[flavour].theme}" data-action="select-${flavour}">${image(productFlavours[flavour].images[0], 'Aura Whey ' + flavour)}<span><strong>Aura Whey</strong><span>${flavour}</span><small>1 kg · ${productPrice}</small></span><span class="search-product-arrow" aria-hidden="true">↗</span></button>`).join('');
+}
+
+function openSearch() {
+  document.querySelector('.mobile-panel')?.classList.remove('open');
+  document.querySelector('.overlay')?.classList.remove('open');
+  const dialog = document.querySelector('#search-dialog');
+  document.querySelector('#search-overlay-input').value = state.searchQuery;
+  updateSearchResults();
+  dialog.showModal();
+  document.body.classList.add('search-open');
+  document.querySelector('#search-overlay-input').focus();
+}
+
+function closeSearch() {
+  document.querySelector('#search-dialog').close();
+  document.body.classList.remove('search-open');
+}
+
 
 function account() { return `<section class="page-intro compact"><p class="hero-overline">Your account</p><h1>Sign in to Aura Whey.</h1><div class="account-layout"><form class="form" data-form="account"><label class="field">Email address<input name="email" type="email" placeholder="you@example.com" /></label><label class="field">Password<input name="password" type="password" placeholder="Your password" /></label>${button('submit-account', 'Sign in', 'primary')}</form><div class="account-aside"><h3>New here?</h3><p>Create your customer account during Shopify checkout. You can then return to view your orders.</p>${routeLink('track-order', 'Track an order instead', 'text-link')}</div></div><div id="account-result" aria-live="polite"></div></section>`; }
 
-function blog() { return `<section class="page-intro"><p class="hero-overline">Aura journal</p><h1>Train with clarity.</h1><p>Practical reads for choosing your product and making your routine easier to keep.</p></section><section class="section"><div class="featured-post"><div class="featured-image">${image(assets.duo, posts[0].title)}</div><div><p class="hero-overline">Featured guide</p><h2>${posts[0].title}</h2><p>${posts[0].excerpt}</p>${routeLink('article', 'Read the guide', 'button-link primary')}</div></div></section><section class="section"><div class="section-inner"><div class="grid grid-3">${[0, 1, 2, 0, 1, 2].map(blogCard).join('')}</div></div></section>`; }
+function blog() { return `<section class="page-intro"><p class="hero-overline">Aura journal</p><h1>Train with clarity.</h1><p>Practical reads for choosing your product and making your routine easier to keep.</p></section><section class="section"><div class="featured-post"><div class="featured-image">${image(posts[0].image, posts[0].alt)}</div><div><p class="hero-overline">Featured guide</p><h2>${posts[0].title}</h2><p>${posts[0].excerpt}</p>${routeLink(`article/${posts[0].slug}`, 'Read the guide', 'button-link primary')}</div></div></section><section class="section"><div class="section-inner"><div class="grid grid-3">${[0, 1, 2].map(blogCard).join('')}</div></div></section>`; }
 
-function article() { return `<article class="article"><p>${routeLink('blog', 'Back to journal', 'text-link')}</p><p class="hero-overline">Product guide</p><h1>How to choose a whey protein flavour</h1><p class="article-meta">Aura Whey Journal · 5 minute read</p><div class="article-hero">${image(assets.duo, 'Aura Whey product flavours')}</div><div class="article-layout"><div><h2>Start with the flavour you will use.</h2><p>The best choice is usually the flavour that makes your everyday shake easy to enjoy. Rich Chocolate keeps things familiar, while Mawa Kulfi brings a creamier, dessert-inspired profile.</p><h2>Keep your routine simple.</h2><p>Use the product label as your reference for serving size, nutrition information, ingredients, and allergen guidance. Consistency is easier when the plan is clear.</p></div><aside class="article-aside"><strong>Explore Aura Whey</strong>${routeLink('shop', 'Shop both flavours', 'text-link')}${routeLink('quality', 'View quality documents', 'text-link')}</aside></div></article>`; }
+function article() {
+  const slug = location.hash.split('/')[2];
+  const post = posts.find(item => item.slug === slug) || posts[0];
+  return `<article class="article"><p>${routeLink('blog', 'Back to journal', 'text-link')}</p><p class="hero-overline">Aura journal</p><h1>${post.title}</h1><p class="article-meta">Aura Whey Journal · 1 minute read</p><div class="article-hero">${image(post.image, post.alt)}</div><div class="article-layout"><div>${post.sections.map(([heading, copy]) => `<section><h2>${heading}</h2><p>${copy}</p></section>`).join('')}</div><aside class="article-aside"><strong>Explore Aura Whey</strong>${routeLink('shop', 'Shop both flavours', 'text-link')}${routeLink('blog', 'More from the journal', 'text-link')}</aside></div></article>`;
+}
 
 function authenticate() { return `<section class="page-intro compact"><p class="hero-overline">Product authentication</p><h1>Check your Aura Whey pack.</h1><div class="verify-layout"><div class="verify-image">${image(assets.labelMawa, 'Aura Whey pack label')}</div><div><p>Enter the authentication code printed on your pack. For this interactive preview, use <strong>AURA-2026-001</strong> or <strong>AURA-2026-USED</strong>.</p><form class="form" data-form="authenticate"><label class="field">Pack code<input name="code" placeholder="Enter pack code" /></label>${button('verify-code', 'Verify code', 'primary', 'check')}</form><div id="auth-result" aria-live="polite"></div></div></div></section>`; }
 
 function trackOrder() { return `<section class="page-intro compact"><p class="hero-overline">Order tracking</p><h1>Where is your order?</h1><div class="track-layout"><div><form class="form" data-form="tracking"><label class="field">Order number<input name="order" placeholder="e.g. AW-1001" /></label><label class="field">Email address<input name="email" type="email" placeholder="Email used at checkout" /></label>${button('find-order', 'Find order', 'primary')}</form><div id="tracking-result" aria-live="polite"></div></div><div class="track-help"><h3>Need help?</h3><p>Your order number is included in the email confirmation sent after checkout.</p>${routeLink('contact', 'Contact support', 'text-link')}</div></div></section>`; }
 
 const faqs = [
-  ['Which flavours are available?', 'Aura Whey Protein is currently available in Mawa Kulfi and Rich Chocolate flavours.'],
-  ['How much protein is in one serving?', 'The product label states 24 g protein per 35 g serving, with 5.7 g BCAAs.'],
-  ['How do I authenticate my product?', 'Visit Authenticate, then enter the code printed on your Aura Whey pack.'],
-  ['Where can I read the certificates?', 'The Quality & lab reports page contains the supplied manufacturing and food-safety documents.'],
-  ['How do I track an order?', 'Use your order number and the email address used at checkout on the Track order page.']
+  [
+    "Which flavours are available?",
+    "Choose Mawa Kulfi for a creamy, dessert-inspired profile or Rich Chocolate for a familiar cocoa flavour. <a href=\"#/shop\">Shop both flavours</a> or <a href=\"#/article/mawa-kulfi-or-rich-chocolate\">read the flavour guide</a>."
+  ],
+  [
+    "What is the source of protein? Is it natural?",
+    "Whey is a milk-derived protein. That does not mean every ingredient in a flavoured powder is natural. Check your flavour’s full ingredient list on the pack."
+  ],
+  [
+    "How much protein is in a serving?",
+    "Use the nutrition panel on your particular pack for protein content and serving size. Check the <a href=\"#/shop\">product details</a> alongside the label before choosing your serving."
+  ],
+  [
+    "When should I consume it?",
+    "Choose a convenient time that fits your meals and routine, following the pack directions. A supplement is an addition to a balanced diet. <a href=\"#/article/plan-your-protein-routine\">Explore a simple routine</a>."
+  ],
+  [
+    "How do I prepare it?",
+    "Measure the serving and mix with the amount of liquid specified on your pack. Shake or stir as directed. Use clean equipment and follow the label rather than estimating the scoop size."
+  ],
+  [
+    "Is it safe for lactose-intolerant individuals?",
+    "Whey products may contain lactose, and tolerance varies. Do not assume this product is lactose-free. Check the label and ask your clinician if unsure. Milk allergy is different: milk-derived whey should be avoided if you have a milk allergy."
+  ],
+  [
+    "Will it cause bloating, gas or acne?",
+    "We cannot promise that any powder will be symptom-free for everyone. Lactose can cause digestive symptoms in people who do not tolerate it. If you notice digestive or skin symptoms, stop using it and discuss them with a healthcare professional."
+  ],
+  [
+    "What is the shelf life?",
+    "Use the manufacturing and best-before dates printed on your pack. Shelf life and any instructions after opening should come from that label, not from another brand’s product."
+  ],
+  [
+    "How should I store it?",
+    "Follow the pack’s storage directions. Keep the container tightly closed, protect it from moisture and use a clean, dry scoop. Check the label for any additional temperature or handling requirements."
+  ],
+  [
+    "How is Aura Whey different?",
+    "Aura offers Mawa Kulfi and Rich Chocolate flavour choices with product information and a quality library to explore. Compare ingredients, serving sizes and documentation when choosing; we do not claim it is superior to every other powder."
+  ],
+  [
+    "Is it manufactured locally or imported?",
+    "Check the manufacturer, country of origin and any importer details printed on your pack. <a href=\"#/contact\">Contact us</a> with a pack photo or batch details if you need help confirming the origin."
+  ],
+  [
+    "Is it suitable for vegetarians?",
+    "Whey is dairy-derived and is not vegan. For vegetarian suitability of the complete formula, check the vegetarian mark and ingredients on your pack, including any enzymes."
+  ],
+  [
+    "Is it suitable for women?",
+    "Protein is a dietary nutrient for women as well as men. Whether this particular supplement suits you depends on your diet, allergies and health needs. Follow the adult-use label and seek individual advice where needed."
+  ],
+  [
+    "Do I need protein powder if I do not go to the gym?",
+    "Going to the gym does not determine whether you need a supplement. If your meals meet your protein needs, powder may be unnecessary. A qualified dietitian can help assess your diet."
+  ],
+  [
+    "Does protein powder cause weight gain?",
+    "A serving contributes to your overall food and energy intake. It does not guarantee weight gain or weight loss. Consider how it fits into your usual meals and goals."
+  ],
+  [
+    "Can teenagers use it?",
+    "This storefront presents an adult product. Do not give it to someone under 18 without advice from their clinician or a qualified dietitian and confirmation that the product label allows it."
+  ],
+  [
+    "Will I automatically grow big muscles?",
+    "A shake alone does not automatically create large muscles. Training, overall nutrition and individual factors influence results. No specific physique or result is guaranteed."
+  ],
+  [
+    "What is lecithin, and is it in this product?",
+    "If lecithin is listed on your pack, contact us for its source and intended role in that formula. We have not confirmed its presence here, so do not assume this product contains it or is soy-free."
+  ],
+  [
+    "What is bromelain, and is it in this product?",
+    "Check the ingredient list for bromelain and contact us for details if it appears. Its inclusion and amount have not been confirmed for this product; we do not promise enzyme-related digestive benefits."
+  ],
+  [
+    "Is it suitable during pregnancy or breastfeeding?",
+    "Ask your obstetrician or healthcare professional to review the full product label before use. We cannot confirm suitability during pregnancy or breastfeeding from general product information."
+  ],
+  [
+    "Is it suitable for people with diabetes?",
+    "Ask your treating clinician or dietitian to review the complete nutrition and ingredient panels alongside your care plan. Do not assume a whey supplement is sugar-free or suitable for diabetes."
+  ],
+  [
+    "Can I use it in cooking?",
+    "Follow the pack’s preparation instructions. If cooking or heating guidance is not provided, <a href=\"#/contact\">ask support</a> before using it in a recipe. We have not validated this formula for cooking."
+  ],
+  [
+    "What is the difference between whey concentrate and isolate?",
+    "These are different forms of whey protein. Compare their declared protein, lactose, fat and ingredient information on the labels rather than assuming they are interchangeable. This product’s precise blend should be confirmed from its pack."
+  ],
+  [
+    "Which processing method is used?",
+    "We have not confirmed the filtration or processing method for this formula. <a href=\"#/contact\">Contact us</a> for manufacturer information; we do not claim cold processing or a specific filtration technique without documentation."
+  ],
+  [
+    "Where can I find quality certificates?",
+    "Visit <a href=\"#/quality\">Quality & lab reports</a> for the document categories. Source certificate files are not yet available in this preview. Contact support if you need a certificate before ordering."
+  ],
+  [
+    "How do I authenticate a pack?",
+    "Open <a href=\"#/authenticate\">Authenticate</a> and follow the pack-code instructions. The current preview uses demonstration codes; it does not verify a real purchase."
+  ],
+  [
+    "How can I track an order or request a return?",
+    "Visit <a href=\"#/track-order\">Track order</a> for the tracking form, <a href=\"#/policy\">store policies</a> for shipping and return information, or <a href=\"#/contact\">contact support</a>. Live order lookup is not connected in this preview."
+  ]
 ];
 
 function faqItems(limit = false) { return `<div class="accordion">${faqs.slice(0, limit ? 2 : faqs.length).map(([question, answer], index) => `<div><button type="button" data-action="faq-${index}" aria-expanded="false"><span>${question}</span>${icon('chevron')}</button><div class="accordion-panel" hidden>${answer}</div></div>`).join('')}</div>`; }
-function faq() { return `<section class="page-intro compact"><p class="hero-overline">FAQs</p><h1>Answers, without the runaround.</h1>${faqItems()}</section>`; }
+function faq() { return ''; }
 
 function contact() { return `<section class="page-intro compact"><p class="hero-overline">Contact Aura Whey</p><h1>How can we help?</h1><div class="contact-layout"><div><form class="form" data-form="contact"><label class="field">Name<input name="name" placeholder="Your name" /></label><label class="field">Email address<input name="email" type="email" placeholder="you@example.com" /></label><label class="field">Message<textarea name="message" rows="5" placeholder="Tell us how we can help"></textarea></label>${button('send-message', 'Send message', 'primary')}</form><div id="contact-result" aria-live="polite"></div></div><div class="contact-aside"><h3>Before you contact us</h3><p>For an existing order, keep your order number nearby. For product verification, use the code printed on the pack.</p>${routeLink('track-order', 'Track an order', 'text-link')}${routeLink('authenticate', 'Authenticate a pack', 'text-link')}</div></div></section>`; }
 
@@ -334,9 +564,9 @@ function policy() { return `<section class="page-intro compact"><p class="hero-o
 
 function documentPage() { return `<section class="page-intro compact"><p class="hero-overline">Quality document</p><h1>${state.document}</h1><div class="document-viewer"><div class="document-sheet"><div class="document-stamp">AW</div><h2>${state.document}</h2><p>This screen is ready to connect to the supplied source PDF when the document library is added to the production store.</p><div class="document-lines"><i></i><i></i><i></i><i></i></div></div><div><p>Use the quality library to browse the supplied certificates for Aura Whey.</p>${routeLink('quality', 'Back to quality documents', 'button-link')}</div></div></section>`; }
 
-const views = { home, shop, cart, checkout, quality, blog, article, authenticate, 'track-order': trackOrder, faq, contact, policy, document: documentPage, search, account };
+const views = { home, shop, cart, checkout, quality, blog, article, authenticate, 'track-order': trackOrder, faq, contact, policy, document: documentPage, account };
 
-function currentRoute() { return location.hash.replace('#/', '') || 'home'; }
+function currentRoute() { return location.hash.replace('#/', '').split('/')[0] || 'home'; }
 function applyTheme() {
   document.documentElement.dataset.theme = state.theme;
   document.documentElement.dataset.coupon = state.couponOpen ? 'open' : 'closed';
@@ -426,10 +656,18 @@ function initHeroCarousel() {
   startHeroTimer();
 }
 
-function render() { applyTheme(); shell((views[currentRoute()] || home)()); bindEvents(); initHeroCarousel(); }
+function render() { document.body.classList.remove('search-open'); applyTheme(); shell((views[currentRoute()] || home)()); bindEvents(); initHeroCarousel(); showSavedReview(); }
 function navigate(route) { location.hash = `/${route}`; }
 
 function bindEvents() {
+  const dialog = document.querySelector('#search-dialog');
+  dialog.addEventListener('close', () => document.body.classList.remove('search-open'));
+  dialog.addEventListener('click', event => { if (event.target === dialog) closeSearch(); });
+  document.querySelector('#search-overlay-input').addEventListener('input', updateSearchResults);
+  document.querySelector('#search-products').addEventListener('click', event => {
+    const card = event.target.closest('[data-action]');
+    if (card) { closeSearch(); handleAction(card.dataset.action, card); }
+  });
   document.querySelectorAll('[data-route]').forEach(link => link.addEventListener('click', () => setTimeout(() => document.querySelector('main')?.focus(), 0)));
   document.querySelectorAll('[data-action]').forEach(element => element.addEventListener('click', () => handleAction(element.dataset.action, element)));
   document.querySelectorAll('form[data-form]').forEach(form => form.addEventListener('submit', handleForm));
@@ -450,6 +688,8 @@ function showToast(message) {
 }
 
 function handleAction(action, element) {
+  if (action === 'open-search') return openSearch();
+  if (action === 'close-search') return closeSearch();
   if (action === 'apply-coupon') {
     state.coupon = 'DISC5';
     showToast('Coupon "DISC5" applied! 5% discount active.');
@@ -479,6 +719,7 @@ function handleAction(action, element) {
   if (action.startsWith('tab-')) { state.tab = action.replace('tab-', ''); return render(); }
   if (action === 'add-cart') { state.cart = 1; return navigate('cart'); }
   if (action === 'remove-cart') { state.cart = 0; state.quantity = 1; return render(); }
+  if (action === 'aura-up' || action === 'aura-down') return updateAuraQuantity(action, element);
   if (action === 'quantity-up') { state.quantity += 1; return render(); }
   if (action === 'quantity-down') { state.quantity = Math.max(1, state.quantity - 1); return render(); }
   if (action === 'checkout') return navigate('checkout');
@@ -490,6 +731,21 @@ function handleAction(action, element) {
 function handleForm(event) {
   event.preventDefault();
   const form = event.currentTarget;
+  if (form.dataset.form === 'review') {
+    if (!form.reportValidity()) return;
+    const name = form.elements.reviewName.value.trim();
+    const text = form.elements.reviewText.value.trim();
+    const rating = Number(form.elements.rating.value);
+    const result = document.querySelector('#review-result');
+    if (!name || text.length < 10 || text.length > 1000 || name.length > 60 || !Number.isInteger(rating) || rating < 1 || rating > 5) { result.textContent = 'Add your name, a rating and at least 10 characters about your experience.'; return; }
+    try {
+      localStorage.setItem('aura-review-' + state.flavour, JSON.stringify({ name, text, rating }));
+      showSavedReview();
+      result.textContent = 'Your review preview is saved in this browser. It has not been published.';
+      form.reset();
+    } catch { result.textContent = 'Browser storage is unavailable. Your review has not been saved; please keep a copy of your text.'; }
+    return;
+  }
   if (form.dataset.form === 'coupon') { state.coupon = form.elements.coupon.value.trim().toUpperCase(); return render(); }
   if (form.dataset.form === 'authenticate') {
     const value = form.elements.code.value.trim().toUpperCase();
@@ -507,10 +763,13 @@ function handleForm(event) {
   }
   if (form.dataset.form === 'contact') { document.querySelector('#contact-result').innerHTML = '<div class="result state-valid"><strong>Message received</strong><p>Thanks. The support team will reply to the email address you provided.</p></div>'; return; }
   if (form.dataset.form === 'account') { document.querySelector('#account-result').innerHTML = '<div class="result"><strong>Account sign-in</strong><p>Connect this form to Shopify customer accounts when the store integration is enabled.</p></div>'; return; }
-  if (form.dataset.form === 'search') { state.searchQuery = form.elements.query.value.trim(); return form.dataset.mobileSearch ? navigate('search') : render(); }
+  if (form.dataset.form === 'search') return updateSearchResults();
 }
 
-window.addEventListener('hashchange', render);
+window.addEventListener('hashchange', () => {
+  render();
+  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+});
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', render);
 } else {
