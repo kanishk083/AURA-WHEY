@@ -4,14 +4,12 @@ export const links = [
   ['faq', 'FAQs'], ['contact', 'Contact']
 ];
 
-const assetBase = './stitch_aura_whey_storefront_design/';
-
 export const assets = {
-  chocolate: `${assetBase}chatgpt_image_aug_15_2026_02_36_24_pm.png/screen.png`,
-  mawa: `${assetBase}chatgpt_image_aug_15_2026_02_34_55_pm.png/screen.png`,
-  duo: `${assetBase}chatgpt_image_aug_15_2026_02_33_29_pm.png/screen.png`,
-  labelMawa: `${assetBase}whatsapp_image_2026_07_22_at_21.31.00.jpeg/screen.png`,
-  why: `${assetBase}chatgpt_image_sep_4_2026_07_09_56_pm.png/screen.png`
+  chocolate: './assets/optimized/chocolate-1.jpg',
+  mawa: './assets/optimized/kulfi-1.jpg',
+  duo: './assets/optimized/campaign-duo.jpg',
+  labelMawa: './assets/optimized/label-mawa.jpg',
+  why: './assets/optimized/campaign-why.jpg'
 };
 
 export const productPrice = '₹4,199';

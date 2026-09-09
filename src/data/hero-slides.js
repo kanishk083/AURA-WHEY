@@ -1,37 +1,43 @@
-const assetBase = './stitch_aura_whey_storefront_design/';
-
 // Replace a banner by changing only the desktopImage/mobileImage values here.
 export const heroSlides = [
   {
+    id: 'flavour-combo',
+    title: 'Aura Whey flavour combination',
+    alt: 'Aura Whey Rich Chocolate and Mawa Kulfi protein tubs',
+    desktopImage: './assets/optimized/hero-combo-1920.jpg',
+    mobileImage: './assets/optimized/hero-combo-960.jpg',
+    link: '#/shop'
+  },
+  {
     id: 'rich-chocolate',
-    title: 'Aura Whey — Rich Chocolate',
-    alt: 'Aura Whey Rich Chocolate promotional banner',
-    desktopImage: `${assetBase}chatgpt_image_sep_4_2026_06_59_38_pm_4.png/screen.png`,
-    mobileImage: '',
+    title: 'Aura Whey Rich Chocolate',
+    alt: 'Aura Whey Rich Chocolate protein promotional banner',
+    desktopImage: './assets/optimized/hero-chocolate-1920.jpg',
+    mobileImage: './assets/optimized/hero-chocolate-960.jpg',
     link: '#/shop'
   },
   {
     id: 'mawa-kulfi',
-    title: 'Aura Whey — Mawa Kulfi',
-    alt: 'Aura Whey Mawa Kulfi promotional banner',
-    desktopImage: `${assetBase}chatgpt_image_sep_4_2026_07_04_00_pm.png/screen.png`,
-    mobileImage: '',
+    title: 'Aura Whey Mawa Kulfi',
+    alt: 'Aura Whey Mawa Kulfi protein promotional banner',
+    desktopImage: './assets/optimized/hero-kulfi-1920.jpg',
+    mobileImage: './assets/optimized/hero-kulfi-960.jpg',
     link: '#/shop'
   },
   {
-    id: 'pure-whey-lineup',
-    title: 'Aura Whey — Pure Nutraceutical Lineup',
-    alt: 'Aura Whey product lineup promotional banner',
-    desktopImage: `${assetBase}chatgpt_image_sep_4_2026_07_09_56_pm.png/screen.png`,
-    mobileImage: '',
+    id: 'training-benefits',
+    title: 'Why choose Aura Whey',
+    alt: 'Aura Whey protein tubs with athlete and product benefits',
+    desktopImage: './assets/optimized/hero-benefits-1920.jpg',
+    mobileImage: './assets/optimized/hero-benefits-960.jpg',
     link: '#/shop'
   },
   {
-    id: 'signature-experience',
-    title: 'Aura Whey — Flavour Meets Performance',
-    alt: 'Aura Whey flavour experience promotional banner',
-    desktopImage: `${assetBase}chatgpt_image_aug_15_2026_02_33_29_pm.png/screen.png`,
-    mobileImage: '',
+    id: 'performance-routine',
+    title: 'Fuel your Aura Whey routine',
+    alt: 'Aura Whey protein tubs with athlete and performance benefits',
+    desktopImage: './assets/optimized/hero-routine-1920.jpg',
+    mobileImage: './assets/optimized/hero-routine-960.jpg',
     link: '#/shop'
   }
 ];
