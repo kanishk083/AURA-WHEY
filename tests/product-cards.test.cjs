@@ -2,23 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
-
+const { storefront } = require('./storefront-helper.cjs');
 const root = path.resolve(__dirname, '..');
-const source = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
-
-// Run the actual storefront templates and actions without starting its DOM lifecycle.
-function storefront() {
-  const events = {};
-  const context = vm.createContext({
-    document: { querySelector: () => null, readyState: 'loading', addEventListener() {} },
-    window: { addEventListener(name, handler) { events[name] = handler; } },
-    localStorage: { getItem: () => null },
-    location: { hash: '#/home' }
-  });
-  vm.runInContext(source, context);
-  return { context, events, run: code => vm.runInContext(code, context) };
-}
 
 for (const flavour of ['Mawa Kulfi', 'Rich Chocolate']) {
   test(`${flavour}: navigation resets homepage scroll after rendering the selected product`, () => {
@@ -28,7 +13,7 @@ for (const flavour of ['Mawa Kulfi', 'Rich Chocolate']) {
     context.captureRender = html => { rendered = html; };
     run('render = () => captureRender(shop())');
     context.window.scrollTo = options => {
-      assert.ok(rendered.includes(`Aura Whey <span>${flavour}</span>`));
+      assert.ok(rendered.includes(`Aura Whey ${flavour}`));
       assert.equal(options.behavior, 'instant');
       assert.equal(options.left, 0);
       scrollTop = options.top;
@@ -62,16 +47,15 @@ for (const [flavour, theme] of [['Mawa Kulfi', 'flavour-kulfi'], ['Rich Chocolat
     for (const url of images) assert.ok(fs.existsSync(path.join(root, decodeURIComponent(url))), url);
   });
 
-  test(`${flavour}: card add-to-cart keeps the selected flavour and price`, () => {
+  test(`${flavour}: card add-to-cart keeps the selected flavour and price`, async () => {
     const { run } = storefront();
-    run(`handleAction('add-flavour-${flavour}')`);
-    assert.equal(run('state.flavour'), flavour);
+    await run(`handleAction('add-flavour-${flavour}')`);
     assert.equal(run('state.cart'), 1);
     assert.equal(run('location.hash'), '/cart');
-    assert.equal(run('totals().total'), 4199);
+    assert.equal(Number(run('commerce.cart.cost.totalAmount.amount')), flavour === 'Mawa Kulfi' ? 4199 : 4499);
     assert.ok(run('cart()').includes(`Aura Whey ${flavour}`));
-    run("state.coupon = 'DISC5'");
-    assert.equal(run('totals().total'), 3989);
+    await run("applyShopifyCoupon('DISC5')");
+    assert.equal(Number(run('commerce.cart.cost.totalAmount.amount')), Number(((flavour === 'Mawa Kulfi' ? 4199 : 4499) * .95).toFixed(2)));
   });
 }
 
@@ -99,15 +83,15 @@ test('homepage keeps both cards and the existing five-slide hero', () => {
   assert.ok(markup.includes('grid product-grid'));
 });
 
-test('product page includes responsive quick-purchase actions and Buy now opens checkout', () => {
-  const { run } = storefront();
+test('product page includes responsive quick-purchase actions and Buy now opens checkout', async () => {
+  const { run, redirects } = storefront();
   const markup = run('shop()');
   assert.ok(markup.includes('id="floating-purchase"'));
   assert.equal((markup.match(/data-action="buy-now"/g) || []).length, 2);
   assert.equal((markup.match(/data-action="add-cart"/g) || []).length, 2);
-  run("handleAction('buy-now')");
+  await run("handleAction('buy-now')");
   assert.equal(run('state.cart'), 1);
-  assert.equal(run('location.hash'), '/checkout');
+  assert.equal(redirects[0], 'https://cay9kn-xc.myshopify.com/checkouts/test');
 });
 
 test('quick-purchase bar is shown only while the main purchase controls are off screen', () => {
