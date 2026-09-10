@@ -98,3 +98,80 @@ test('homepage keeps both cards and the existing five-slide hero', () => {
   assert.equal(run('heroSlides.length'), 5);
   assert.ok(markup.includes('grid product-grid'));
 });
+
+test('product page includes responsive quick-purchase actions and Buy now opens checkout', () => {
+  const { run } = storefront();
+  const markup = run('shop()');
+  assert.ok(markup.includes('id="floating-purchase"'));
+  assert.equal((markup.match(/data-action="buy-now"/g) || []).length, 2);
+  assert.equal((markup.match(/data-action="add-cart"/g) || []).length, 2);
+  run("handleAction('buy-now')");
+  assert.equal(run('state.cart'), 1);
+  assert.equal(run('location.hash'), '/checkout');
+});
+
+test('quick-purchase bar is shown only while the main purchase controls are off screen', () => {
+  const { context, run } = storefront();
+  const classes = new Set();
+  const bar = {
+    classList: { toggle(name, enabled) { enabled ? classes.add(name) : classes.delete(name); } },
+    setAttribute(name, value) { this[name] = value; }
+  };
+  const controls = {};
+  const header = { getBoundingClientRect: () => ({ height: 130 }) };
+  context.document.querySelector = selector => ({
+    '.product-actions': controls,
+    '#floating-purchase': bar,
+    '.site-header': header
+  })[selector] || null;
+  let observerCallback;
+  context.window.IntersectionObserver = class {
+    constructor(callback) { observerCallback = callback; }
+    observe() {}
+    disconnect() {}
+  };
+  run('initFloatingPurchaseBar()');
+  context.observerCallback = observerCallback;
+  run('observerCallback([{ isIntersecting: false, intersectionRatio: 0 }])');
+  assert.ok(classes.has('is-visible'));
+  assert.equal(bar['aria-hidden'], 'false');
+  run('observerCallback([{ isIntersecting: true, intersectionRatio: .6 }])');
+  assert.ok(!classes.has('is-visible'));
+  assert.equal(bar['aria-hidden'], 'true');
+});
+
+test('store FAQ renders a centered heading and the complete accordion', () => {
+  const { run } = storefront();
+  const markup = run('storeFaq()');
+  assert.ok(markup.includes('class="store-faq-heading"'));
+  assert.ok(markup.includes('<h2>Got questions?</h2>'));
+  assert.ok(markup.includes('<p>Let’s dive in.</p>'));
+  assert.equal((markup.match(/data-action="faq-/g) || []).length, run('faqs.length'));
+});
+
+test('Aura feedback scales up by quantity and tracks consecutive removals', () => {
+  const { run } = storefront();
+  run('state.quantity = 2');
+  assert.equal(run("auraFeedback('aura-up')"), '+2000 AURA');
+  run('state.quantity = 3');
+  assert.equal(run("auraFeedback('quantity-up')"), '+3000 AURA');
+  run('state.quantity = 2');
+  assert.equal(run("auraFeedback('aura-down')"), '−1000 AURA');
+  run('state.quantity = 1');
+  assert.equal(run("auraFeedback('quantity-down')"), '−2000 AURA');
+  run('state.quantity = 2');
+  assert.equal(run("auraFeedback('aura-up')"), '+2000 AURA');
+  assert.equal(run('state.auraDownStreak'), 0);
+});
+
+test('quality page includes the newly supplied test report and FDA facility registration', () => {
+  const { run } = storefront();
+  const markup = run('quality()');
+  assert.ok(markup.includes('Independent protein test report'));
+  assert.ok(markup.includes('assets/SMP-050826010%20(Aura%20Whey).pdf'));
+  assert.ok(markup.includes('U.S. FDA facility registration'));
+  assert.ok(markup.includes('assets/nutri-certi-6.webp'));
+  assert.ok(markup.includes('not FDA product approval'));
+  assert.ok(markup.includes('View certificate'));
+  assert.equal(run('documents.length'), 9);
+});

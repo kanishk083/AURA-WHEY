@@ -527,7 +527,7 @@ button.thumbnail:hover { border-color: var(--gold); }
 .cart-item h2, .summary h2 { margin-bottom: .4rem; color: var(--text); font-size: 1.12rem; }
 .cart-item p { margin-bottom: .5rem; font-size: .8rem; }
 .item-price { display: block; margin-bottom: .8rem; color: var(--gold); font: 800 1.2rem/1 Montserrat, Arial, sans-serif; }
-.quantity { display: flex; align-items: center; gap: .55rem; color: var(--muted); font-size: .78rem; }
+.quantity { position: relative; display: flex; align-items: center; gap: .55rem; color: var(--muted); font-size: .78rem; }
 .quantity-button { min-height: 30px; min-width: 30px; padding: .2rem; }
 .summary { align-self: start; padding: 1.3rem; border: 1px solid color-mix(in srgb, var(--gold) 32%, var(--line)); border-radius: var(--radius-md); background: var(--surface); box-shadow: 0 12px 32px -18px rgba(0,0,0,.8); }
 .summary-row { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; padding: .7rem 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .82rem; }
@@ -717,6 +717,34 @@ html[data-theme="dark"] .product-page.flavour-chocolate { --bg: #291c16; --surfa
 .product-page :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .product-page .price { flex-wrap: wrap; }
 .product-page .field { min-width: 0; }
+.floating-purchase {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 48;
+  padding: .65rem max(1rem, env(safe-area-inset-right)) max(.65rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, .18);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(100%);
+  pointer-events: none;
+  transition: opacity .2s ease, transform .25s ease, visibility .25s;
+}
+.floating-purchase.is-visible { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; }
+.floating-purchase-inner { width: min(1120px, 100%); min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 2rem; margin: 0 auto; }
+.floating-product-summary { min-width: 0; display: grid; grid-template-columns: 58px minmax(12rem, 1fr) auto; align-items: center; gap: .85rem; }
+.floating-product-summary img { width: 58px; height: 58px; padding: 2px; border-radius: 6px; background: var(--flavour-media); object-fit: contain; }
+.floating-product-summary div { min-width: 0; display: grid; }
+.floating-product-summary strong { overflow: hidden; color: var(--text); font: 800 .82rem/1.3 Montserrat, Arial, sans-serif; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.floating-product-summary span { color: var(--muted); font-size: .7rem; }
+.floating-product-summary > b { color: var(--gold); font: 900 1.35rem/1 Montserrat, Arial, sans-serif; white-space: nowrap; }
+.floating-purchase-actions { flex: 0 0 auto; display: grid; grid-template-columns: repeat(2, minmax(10rem, 12rem)); gap: .65rem; }
+.floating-purchase .button { width: 100%; min-height: 48px; }
+.product-page .floating-add { border-color: var(--flavour-button); background: var(--surface); color: var(--flavour-button); }
+.product-page .floating-add:hover { border-color: var(--flavour-hover); background: var(--flavour-hover); color: #fffaf4; }
 .aura-quantity { position: relative; display: grid; grid-template-columns: 48px 1fr 48px; align-items: stretch; width: 100%; margin-bottom: 1rem; border: 1px solid var(--gold); border-radius: 6px; }
 .aura-quantity > button { min-height: 46px; padding: 0; border: 0; background: var(--flavour-button); color: #fffaf4; font: 700 1.4rem/1 Montserrat, sans-serif; }
 .aura-quantity > button:first-child { border-radius: 4px 0 0 4px; }
@@ -727,6 +755,7 @@ html[data-theme="dark"] .product-page.flavour-chocolate { --bg: #291c16; --surfa
 .aura-quantity-value { display: grid; place-items: center; font: 800 .8rem/1 Montserrat, sans-serif; letter-spacing: .08em; }
 .aura-bursts { position: absolute; right: 0; top: 0; pointer-events: none; z-index: 5; }
 .aura-burst { position: absolute; right: 0; bottom: 0; display: block; white-space: nowrap; padding: .6rem .85rem; border: 1px solid #ffe1a7; border-radius: 6px; background: #fbbf24; color: #171000; box-shadow: 0 5px 20px #fbbf2440; font: 900 .95rem/1 Montserrat, sans-serif; animation: aura-gain 1.1s ease-out forwards; }
+.aura-burst.is-negative { border-color: #c97865; background: #512b24; color: #fff1ec; box-shadow: 0 5px 20px rgba(81, 43, 36, .32); }
 @keyframes aura-gain {
   0% { opacity: 0; transform: translateY(5px) scale(.7) rotate(-5deg); }
   18% { opacity: 1; transform: translateY(-12px) scale(1.08) rotate(2deg); }
@@ -784,17 +813,34 @@ html[data-theme="dark"] .product-page.flavour-chocolate { --bg: #291c16; --surfa
 .certification-item > span:last-child { color: var(--muted); font-size: .7rem; }
 .nutrition-trust-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem 2rem; margin-top: 1.5rem; font-size: .8rem; }
 .nutrition-trust-bottom p { margin: 0; }
-.store-faq-layout { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: clamp(2rem, 6vw, 6rem); }
-.store-faq-layout > div > p { margin: 1rem 0; }
-.store-faq .accordion { margin-top: 0; }
-.store-faq .accordion button { text-align: left; gap: 1rem; }
-.store-faq .accordion button svg { flex-shrink: 0; }
+.store-faq-layout { width: min(60rem, 100%); }
+.store-faq-heading { margin-bottom: clamp(1.75rem, 4vw, 2.75rem); text-align: center; }
+.store-faq-heading h2 { max-width: none; margin-inline: auto; font-size: clamp(2rem, 4vw, 3rem); }
+.store-faq-heading p { margin: .55rem 0 0; color: var(--gold); font-size: clamp(1.05rem, 1.8vw, 1.3rem); font-style: italic; font-weight: 700; }
+.store-faq-list { width: 100%; }
+.store-faq .accordion { margin-top: 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 10px; }
+.store-faq .accordion > div:last-child { border-bottom: 0; }
+.store-faq .accordion button { gap: 1.25rem; min-height: 68px; padding: 1.2rem 1.35rem; text-align: left; font-size: clamp(1rem, 1.35vw, 1.16rem); line-height: 1.45; }
+.store-faq .accordion button:hover { background: color-mix(in srgb, var(--gold) 7%, transparent); }
+.store-faq .accordion button svg { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
+.store-faq .accordion-panel { padding: 0 3.8rem 1.35rem 1.35rem; font-size: clamp(.98rem, 1.2vw, 1.08rem); line-height: 1.75; }
+.store-faq .faq-sources { margin: 1.35rem auto 0; font-size: .88rem; line-height: 1.65; text-align: center; }
+.store-faq-contact { margin: 1.5rem 0 0; text-align: center; }
+.store-faq-contact .text-link { font-size: .78rem; }
 .inside-detail summary:focus-visible, .certification-item:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
 @media (max-width: 640px) {
+  .product-page { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .floating-purchase { padding: 0 0 env(safe-area-inset-bottom); background: var(--surface); }
+  .floating-purchase-inner { min-height: 64px; display: block; }
+  .floating-product-summary { display: none; }
+  .floating-purchase-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; }
+  .floating-purchase .button { min-height: 64px; padding-inline: .5rem; border-radius: 0; font-size: .72rem; }
+  .product-page .floating-add { background: var(--surface); }
   .nutrition-trust-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 1.5rem; }
   .nutrition-trust-stats > div:nth-child(3) { border-left: 0; padding-left: 0; }
   .certification-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
-  .store-faq-layout { grid-template-columns: minmax(0, 1fr); gap: 2rem; }
+  .store-faq .accordion button { min-height: 64px; padding: 1rem; font-size: 1rem; }
+  .store-faq .accordion-panel { padding: 0 2.8rem 1.1rem 1rem; font-size: .98rem; }
 }
 @media (max-width: 640px) {
   .product-grid { grid-template-columns: minmax(0, 36rem); gap: 2rem; }

@@ -84,7 +84,7 @@ heroSlides.forEach((slide, index) => {
 const state = {
   flavour: 'Mawa Kulfi', productImage: 0, quantity: 1, tab: 'Details', cart: 0, coupon: '',
   couponOpen: true, searchQuery: '', heroSlide: 0, theme: localStorage.getItem('aura-theme') || 'dark',
-  document: 'FSSAI licence'
+  document: 'FSSAI licence', auraDownStreak: 0
 };
 
 const svg = (paths) => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
@@ -343,11 +343,16 @@ function showSavedReview() {
 }
 
 function storeFaq() {
-  return `<section class="section store-faq"><div class="section-inner store-faq-layout"><div><h2>Got questions?<br>Let’s dive in.</h2><p>From your first shake to your next order.</p>${routeLink('contact', 'Still have a question? Get in touch', 'text-link')}</div><div>${faqItems()}<p class="faq-sources">General guidance: <a href="https://www.niddk.nih.gov/health-information/digestive-diseases/lactose-intolerance">NIDDK: lactose intolerance</a> and <a href="https://ods.od.nih.gov/factsheets/ExerciseAndAthleticPerformance-Consumer/">NIH: exercise supplements</a>. Your pack label and individual medical advice take priority.</p></div></div></section>`;
+  return `<section class="section store-faq"><div class="section-inner store-faq-layout"><header class="store-faq-heading"><h2>Got questions?</h2><p>Let’s dive in.</p></header><div class="store-faq-list">${faqItems()}<p class="faq-sources">General guidance: <a href="https://www.niddk.nih.gov/health-information/digestive-diseases/lactose-intolerance">NIDDK: lactose intolerance</a> and <a href="https://ods.od.nih.gov/factsheets/ExerciseAndAthleticPerformance-Consumer/">NIH: exercise supplements</a>. Your pack label and individual medical advice take priority.</p></div><p class="store-faq-contact">${routeLink('contact', 'Still have a question? Get in touch', 'text-link')}</p></div></section>`;
+}
+
+function floatingPurchaseBar() {
+  const productImage = productFlavours[state.flavour].images[0];
+  return `<aside class="floating-purchase" id="floating-purchase" aria-label="Quick purchase" aria-hidden="true"><div class="floating-purchase-inner"><div class="floating-product-summary">${image(productImage, `Aura Whey ${state.flavour}`)}<div><strong>Aura Whey ${state.flavour}</strong><span>1 kg · 28 servings</span></div><b>${productPrice}</b></div><div class="floating-purchase-actions">${button('add-cart', 'Add to cart', 'floating-add')}${button('buy-now', 'Buy now', 'primary floating-buy')}</div></div></aside>`;
 }
 
 function shop() {
-  return `<div class="product-page ${productFlavours[state.flavour].theme}"><h1 class="page-title">Aura Whey Protein</h1><div class="product-layout"><section class="product-gallery"><div class="product-main-image">${image(productFlavours[state.flavour].images[state.productImage], `${state.flavour} Aura Whey product`)}</div><div class="thumbnail-row" aria-label="Product images">${productFlavours[state.flavour].images.map((src, index) => `<button type="button" class="thumbnail" data-action="product-image-${index}" aria-label="View ${state.flavour} image ${index + 1}" aria-pressed="${state.productImage === index}">${image(src, `${state.flavour}, image ${index + 1}`)}</button>`).join('')}</div></section><section class="purchase-panel"><p class="breadcrumb">Shop / Whey protein</p><h2>Aura Whey <span>${state.flavour}</span></h2><div class="price">${productPrice}<span>Inclusive of taxes</span></div><p>1 kg · 28 servings · 35 g serving size</p><div class="flavour-picker"><span>Choose flavour</span><div class="button-row"><button type="button" class="flavour ${state.flavour === 'Mawa Kulfi' ? 'active' : ''}" data-action="select-Mawa Kulfi">Mawa Kulfi</button><button type="button" class="flavour ${state.flavour === 'Rich Chocolate' ? 'active' : ''}" data-action="select-Rich Chocolate">Rich Chocolate</button></div></div><div class="coupon-entry">${couponEntry()}</div><div class="product-actions">${auraQuantity()}<div class="button-row">${button('add-cart', 'Add to cart', 'primary', 'bag')}${routeLink('quality', 'View quality documents', 'button-link secondary')}</div></div>${productInside()}</section></div>${productReviews()}${nutritionTrust()}</div>`;
+  return `<div class="product-page ${productFlavours[state.flavour].theme}"><h1 class="page-title">Aura Whey Protein</h1><div class="product-layout"><section class="product-gallery"><div class="product-main-image">${image(productFlavours[state.flavour].images[state.productImage], `${state.flavour} Aura Whey product`)}</div><div class="thumbnail-row" aria-label="Product images">${productFlavours[state.flavour].images.map((src, index) => `<button type="button" class="thumbnail" data-action="product-image-${index}" aria-label="View ${state.flavour} image ${index + 1}" aria-pressed="${state.productImage === index}">${image(src, `${state.flavour}, image ${index + 1}`)}</button>`).join('')}</div></section><section class="purchase-panel"><p class="breadcrumb">Shop / Whey protein</p><h2>Aura Whey <span>${state.flavour}</span></h2><div class="price">${productPrice}<span>Inclusive of taxes</span></div><p>1 kg · 28 servings · 35 g serving size</p><div class="flavour-picker"><span>Choose flavour</span><div class="button-row"><button type="button" class="flavour ${state.flavour === 'Mawa Kulfi' ? 'active' : ''}" data-action="select-Mawa Kulfi">Mawa Kulfi</button><button type="button" class="flavour ${state.flavour === 'Rich Chocolate' ? 'active' : ''}" data-action="select-Rich Chocolate">Rich Chocolate</button></div></div><div class="coupon-entry">${couponEntry()}</div><div class="product-actions">${auraQuantity()}<div class="button-row">${button('add-cart', 'Add to cart', 'floating-add', 'bag')}${button('buy-now', 'Buy now', 'primary')}${routeLink('quality', 'View quality documents', 'button-link secondary')}</div></div>${productInside()}</section></div>${productReviews()}${nutritionTrust()}${floatingPurchaseBar()}</div>`;
 }
 
 function auraQuantity() {
@@ -355,17 +360,46 @@ function auraQuantity() {
 }
 
 function updateAuraQuantity(action, element) {
-  state.quantity = Math.max(1, state.quantity + (action === 'aura-up' ? 1 : -1));
+  if (action === 'aura-down' && state.quantity === 1) return;
+  state.quantity += action === 'aura-up' ? 1 : -1;
   const control = element.closest('.aura-quantity');
   control.querySelector('output').textContent = `${state.quantity} AURA`;
   control.querySelector('[data-action="aura-down"]').disabled = state.quantity === 1;
-  if (action === 'aura-up') {
-    const burst = document.createElement('span');
-    burst.className = 'aura-burst';
-    burst.textContent = '+1000 AURA';
-    control.querySelector('.aura-bursts').appendChild(burst);
-    burst.addEventListener('animationend', () => burst.remove(), { once: true });
+  showAuraBurst(control, auraFeedback(action));
+}
+
+function auraFeedback(action) {
+  if (action.endsWith('up')) {
+    state.auraDownStreak = 0;
+    return `+${state.quantity * 1000} AURA`;
   }
+  state.auraDownStreak += 1;
+  return `−${state.auraDownStreak * 1000} AURA`;
+}
+
+function showAuraBurst(control, text) {
+  if (!control) return;
+  let bursts = control.querySelector('.aura-bursts');
+  if (!bursts) {
+    bursts = document.createElement('div');
+    bursts.className = 'aura-bursts';
+    bursts.setAttribute('aria-hidden', 'true');
+    control.appendChild(bursts);
+  }
+  bursts.querySelector('.aura-burst')?.remove();
+  const burst = document.createElement('span');
+  burst.className = `aura-burst${text.startsWith('−') ? ' is-negative' : ''}`;
+  burst.textContent = text;
+  bursts.appendChild(burst);
+  burst.addEventListener('animationend', () => burst.remove(), { once: true });
+}
+
+function updateCartQuantity(action) {
+  if (action === 'quantity-down' && state.quantity === 1) return;
+  state.quantity += action === 'quantity-up' ? 1 : -1;
+  const feedback = auraFeedback(action);
+  render();
+  showAuraBurst(document.querySelector('.cart-item .quantity'), feedback);
 }
 
 function totals() {
@@ -386,6 +420,8 @@ function checkout() { return `<section class="handoff"><div class="handoff-icon"
 
 const documents = [
   ['FSSAI licence', 'Food safety licence', 'Manufacturer licence — supplied renewal document.', 'fssai.pdf'],
+  ['Independent protein test report', 'Laboratory test report', 'Supplied test certificate for sample SMP-050826010, reporting 67.9% total protein.', 'assets/SMP-050826010%20(Aura%20Whey).pdf'],
+  ['U.S. FDA facility registration', 'Facility registration', 'Supplied Gomzi Life Sciences LLP food-facility registration. This is a facility registration, not FDA product approval.', 'assets/nutri-certi-6.webp'],
   ['ISO 22000 certificate', 'Food safety management', 'ISO 22000:2018 — supplied manufacturer certificate.', 'iso-22000.pdf'],
   ['GMP certificate', 'Manufacturing practice', 'Gomzi Life Science LLP — supplied GMP document.', 'gmp.pdf'],
   ['HACCP certificate', 'Hazard analysis and control', 'Gomzi Life Science LLP — supplied HACCP document.', 'haccp.pdf'],
@@ -394,7 +430,12 @@ const documents = [
   ['GST certificate', 'Business registration', 'Manufacturer GST registration; not a product quality certificate.', 'gst.pdf']
 ];
 
-function documentCard([title, type, detail, file]) { return `<article class="card document-card"><div class="document-icon">${icon('file')}</div><p class="document-type">${type}</p><h3>${title}</h3><p>${detail}</p><div class="button-row"><a class="button-link primary" href="assets/documents/${file}" target="_blank" rel="noopener" aria-label="Open ${title} PDF in a new tab">View PDF</a><a class="button-link" href="assets/documents/${file}" download aria-label="Download ${title} PDF">Download PDF</a></div></article>`; }
+function documentCard([title, type, detail, file]) {
+  const path = file.startsWith('assets/') ? file : `assets/documents/${file}`;
+  const isPdf = path.toLowerCase().endsWith('.pdf');
+  const format = isPdf ? 'PDF' : 'certificate image';
+  return `<article class="card document-card"><div class="document-icon">${icon('file')}</div><p class="document-type">${type}</p><h3>${title}</h3><p>${detail}</p><div class="button-row"><a class="button-link primary" href="${path}" target="_blank" rel="noopener" aria-label="Open ${title} ${format} in a new tab">${isPdf ? 'View PDF' : 'View certificate'}</a><a class="button-link" href="${path}" download aria-label="Download ${title} ${format}">${isPdf ? 'Download PDF' : 'Download image'}</a></div></article>`;
+}
 
 function quality() {
   return `<section class="quality-hero" aria-labelledby="quality-title"><img class="quality-hero-image" src="./assets/lab%20image.png" alt="Illustrative scene of laboratory technicians handling food samples" fetchpriority="high" /><div class="quality-hero-inner"><div class="quality-hero-copy"><p class="hero-overline">Quality & documentation</p><h1 id="quality-title">Quality you can inspect.</h1><p>Explore food-safety and manufacturing information, and learn what to check on your pack.</p></div></div></section><section class="section"><div class="section-inner"><div class="section-head"><div><h2>Certificates</h2><div class="gold-rule"></div></div><p>Food safety, manufacturing, and dietary certification documents.</p></div><div class="grid grid-3">${documents.map(documentCard).join('')}</div></div></section><section class="section"><div class="section-inner quality-process"><div class="quality-process-image">${image(assets.labelMawa, 'Aura Whey product nutrition information')}</div><div><h2>Read the pack first.</h2><p>Nutrition, ingredients, allergen advice, and storage guidance are printed on the product label. We keep the supplied certificates alongside it for straightforward review.</p><div class="button-row">${routeLink('authenticate', 'Authenticate your pack', 'button-link primary')}${routeLink('contact', 'Contact support', 'button-link')}</div></div></div></section>`;
@@ -583,6 +624,7 @@ function applyTheme() {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', state.theme === 'dark' ? '#0a0a0a' : '#f7f4ed');
 }
 let heroTimer = null;
+let purchaseBarObserver = null;
 
 function setHeroSlide(index) {
   const count = heroSlides.length;
@@ -666,7 +708,31 @@ function initHeroCarousel() {
   startHeroTimer();
 }
 
-function render() { document.body.classList.remove('search-open'); applyTheme(); shell((views[currentRoute()] || home)()); bindEvents(); initHeroCarousel(); showSavedReview(); }
+function initFloatingPurchaseBar() {
+  purchaseBarObserver?.disconnect();
+  purchaseBarObserver = null;
+  const purchaseActions = document.querySelector('.product-actions');
+  const purchaseBar = document.querySelector('#floating-purchase');
+  if (!purchaseActions || !purchaseBar) return;
+
+  const setVisible = visible => {
+    purchaseBar.classList.toggle('is-visible', visible);
+    purchaseBar.setAttribute('aria-hidden', String(!visible));
+  };
+
+  if (!('IntersectionObserver' in window)) {
+    setVisible(true);
+    return;
+  }
+
+  const headerHeight = Math.ceil(document.querySelector('.site-header')?.getBoundingClientRect().height || 0);
+  purchaseBarObserver = new window.IntersectionObserver(([entry]) => {
+    setVisible(!(entry.isIntersecting && entry.intersectionRatio >= .15));
+  }, { threshold: [.15], rootMargin: `-${headerHeight}px 0px -72px 0px` });
+  purchaseBarObserver.observe(purchaseActions);
+}
+
+function render() { document.body.classList.remove('search-open'); applyTheme(); shell((views[currentRoute()] || home)()); bindEvents(); initHeroCarousel(); initFloatingPurchaseBar(); showSavedReview(); }
 function navigate(route) { location.hash = `/${route}`; }
 
 function setMobileMenu(open) {
@@ -753,10 +819,10 @@ function handleAction(action, element) {
   if (action.startsWith('add-flavour-')) { state.flavour = action.replace('add-flavour-', ''); state.productImage = 0; state.cart = 1; return navigate('cart'); }
   if (action.startsWith('tab-')) { state.tab = action.replace('tab-', ''); return render(); }
   if (action === 'add-cart') { state.cart = 1; return navigate('cart'); }
-  if (action === 'remove-cart') { state.cart = 0; state.quantity = 1; return render(); }
+  if (action === 'buy-now') { state.cart = 1; return navigate('checkout'); }
+  if (action === 'remove-cart') { state.cart = 0; state.quantity = 1; state.auraDownStreak = 0; return render(); }
   if (action === 'aura-up' || action === 'aura-down') return updateAuraQuantity(action, element);
-  if (action === 'quantity-up') { state.quantity += 1; return render(); }
-  if (action === 'quantity-down') { state.quantity = Math.max(1, state.quantity - 1); return render(); }
+  if (action === 'quantity-up' || action === 'quantity-down') return updateCartQuantity(action);
   if (action === 'checkout') return navigate('checkout');
   if (action === 'shopify-checkout') { document.querySelector('#checkout-result').innerHTML = '<div class="result state-valid"><strong>Checkout handoff ready</strong><p>Connect your Shopify Storefront API or checkout URL here when the store credentials are available.</p></div>'; return; }
   if (action.startsWith('view-document-')) { state.document = action.replace('view-document-', ''); return navigate('document'); }
