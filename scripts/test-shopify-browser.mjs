@@ -74,13 +74,23 @@ try {
   await command('Page.navigate', { url: origin });
   await waitFor('typeof commerce !== "undefined" && !commerce.loading');
   assert.equal(await evaluate('commerce.error'), '');
-  for (const width of [375, 1440]) {
+  for (const width of [320, 375, 390, 430, 768, 1024, 1440]) {
     await command('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 });
     await evaluate("location.hash = '/shop'");
     await waitFor("!!document.querySelector('.purchase-panel')");
     assert.match(await evaluate("document.querySelector('.purchase-panel h2').textContent"), /Mawa Kulfi/);
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `overflow at ${width}`);
     assert.equal(await evaluate("document.querySelector('[data-action=add-cart]').disabled"), false);
+    await evaluate(`(async () => {
+      const img = document.querySelector('.product-main-photo');
+      img.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1600"><rect width="900" height="1600" fill="gold"/></svg>');
+      await img.decode();
+    })()`);
+    assert.equal(await evaluate(`(() => {
+      const frame = document.querySelector('.product-main-image').getBoundingClientRect();
+      const photo = document.querySelector('.product-main-photo').getBoundingClientRect();
+      return photo.top >= frame.top && photo.bottom <= frame.bottom + 1 && photo.left >= frame.left && photo.right <= frame.right + 1;
+    })()`), true, 'portrait image exceeds gallery at ' + width);
   }
   await evaluate("document.querySelector('[data-action=add-cart]').click()");
   await waitFor("location.hash === '#/cart' && !!document.querySelector('.cart-item')");
