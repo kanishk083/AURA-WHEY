@@ -77,7 +77,7 @@ const heroSlides = [
 
 heroSlides.forEach((slide, index) => {
   const desktopTimes = ['02_08_34', '02_11_54', '02_08_58', '02_10_27', '02_10_32'];
-  const mobileTimes = ['03_42_35', '03_42_55', '03_42_45', '03_42_48', '03_42_51'];
+  const mobileTimes = ['03_42_35', '03_54_34', '03_42_45', '03_42_48', '03_42_51'];
   slide.desktopImage = './assets/Hero%20section/desktop/' + encodeURIComponent(`ChatGPT Image Sep 9, 2026, ${desktopTimes[index]} AM(1).png`);
   slide.mobileImage = './assets/Hero%20section/mobile%20hero%20page%20images/' + encodeURIComponent(`ChatGPT Image Sep 12, 2026, ${mobileTimes[index]} AM.png`);
   assets.hero[index] = slide.desktopImage;
