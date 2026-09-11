@@ -162,14 +162,7 @@ async function initCommerce() {
     for (const [flavour, product] of Object.entries(products)) {
       const previous = commerce.products[flavour]?.selectedVariantId;
       product.selectedVariantId = product.variants.nodes.find(variant => variant.id === previous)?.id || product.variants.nodes.find(variant => variant.availableForSale)?.id || product.variants.nodes[0]?.id;
-      const urls = product.images.nodes.map(img => img.url);
-      product.variants.nodes.forEach(variant => { if (variant.image && !urls.includes(variant.image.url)) urls.push(variant.image.url); });
-      if (!urls.length && product.featuredImage) urls.push(product.featuredImage.url);
-      // Keep the supplied Rich Chocolate gallery artwork as the source of truth.
-      // Shopify may return alternate CDN crops (often 2:3), which would replace
-      // the square product-card images at runtime. Other flavours can still use
-      // their live Shopify gallery when available.
-      if (flavour !== 'Rich Chocolate') productFlavours[flavour].images = urls;
+      // Preserve the supplied square gallery artwork for both flavours.
     }
     commerce.products = products;
     state.productImage = 0;

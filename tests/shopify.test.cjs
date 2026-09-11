@@ -60,7 +60,7 @@ test('coupons are only marked applied when Shopify confirms applicability', asyn
   assert.equal(run('commerce.cart.discountCodes.length'), 0);
 });
 
-test('initialization hydrates live images and prices and restores an existing cart', async () => {
+test('initialization preserves square artwork, hydrates product data and restores an existing cart', async () => {
   const { run, storage } = storefront();
   await run("addShopifyProduct('Mawa Kulfi', 2)");
   run(`commerce.client.products = async () => Object.fromEntries(Object.entries(commerce.products).map(([name, product]) => [name, {
@@ -68,7 +68,7 @@ test('initialization hydrates live images and prices and restores an existing ca
   }])); commerce.cart = null; state.cart = 0;`);
   await run('initCommerce()');
   assert.equal(run('state.cart'), 2);
-  assert.equal(run("productFlavours['Mawa Kulfi'].images[0]"), 'https://cdn.shopify.com/test.jpg');
+  assert.equal(run("productFlavours['Mawa Kulfi'].images[0]"), './assets/MK%20Card/Malai%20Kulfi%201.1.png');
   assert.equal(run('liveTitle()'), '&lt;Live &amp; title&gt;');
   assert.equal(run('commerce.loading'), false);
   run('commerce.client.cart = async () => null');
