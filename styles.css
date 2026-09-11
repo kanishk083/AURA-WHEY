@@ -883,6 +883,7 @@ html[data-theme="dark"] .product-page.flavour-chocolate { --bg: #291c16; --surfa
   .product-grid { gap: 1rem; }
 }
 @media (max-width: 768px) {
+  .hero-carousel { aspect-ratio: 1548 / 1016; }
   .product-grid { grid-template-columns: minmax(0, 36rem); }
   .section-head { display: block; }
   .section-head p { margin-top: .75rem; }
