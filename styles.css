@@ -859,7 +859,7 @@ html[data-theme="dark"] .product-page.flavour-chocolate { --bg: #291c16; --surfa
 }
 @media (max-width: 640px) {
   .product-grid { grid-template-columns: minmax(0, 36rem); gap: 2rem; }
-  .product-page .page-title { font-size: 1.75rem; padding-top: 1.5rem; }
+  .product-page .page-title { max-width: calc(100% - 2rem); font-size: clamp(1.45rem, 8vw, 1.75rem); line-height: 1.08; overflow-wrap: anywhere; padding-top: 1.5rem; }
   .product-page .purchase-panel { padding-top: 0; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
