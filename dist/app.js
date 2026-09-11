@@ -846,15 +846,13 @@ function initFloatingPurchaseBar() {
   purchaseBarObserver?.disconnect();
   purchaseBarObserver = null;
   const purchaseActions = document.querySelector('.product-actions');
-  const purchaseGallery = document.querySelector('.product-gallery');
   const purchaseBar = document.querySelector('#floating-purchase');
-  if (!purchaseGallery || !purchaseBar) return;
+  if (!purchaseActions || !purchaseBar) return;
 
   const setVisible = visible => {
     purchaseBar.classList.toggle('is-visible', visible);
     purchaseBar.setAttribute('aria-hidden', String(!visible));
   };
-  setVisible(false);
 
   if (!('IntersectionObserver' in window)) {
     setVisible(true);
@@ -863,9 +861,9 @@ function initFloatingPurchaseBar() {
 
   const headerHeight = Math.ceil(document.querySelector('.site-header')?.getBoundingClientRect().height || 0);
   purchaseBarObserver = new window.IntersectionObserver(([entry]) => {
-    setVisible(!entry.isIntersecting);
-  }, { threshold: 0, rootMargin: `-${headerHeight}px 0px 0px 0px` });
-  purchaseBarObserver.observe(purchaseGallery);
+    setVisible(!(entry.isIntersecting && entry.intersectionRatio >= .15));
+  }, { threshold: [.15], rootMargin: `-${headerHeight}px 0px -72px 0px` });
+  purchaseBarObserver.observe(purchaseActions);
 }
 
 function render() { document.body.classList.remove('search-open'); document.body.classList.remove('menu-open'); applyTheme(); shell((views[currentRoute()] || home)()); bindEvents(); initHeroCarousel(); initFloatingPurchaseBar(); showSavedReview(); }
