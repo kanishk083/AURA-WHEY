@@ -82,7 +82,7 @@ heroSlides.forEach((slide, index) => {
 });
 
 const state = {
-  flavour: 'Mawa Kulfi', productImage: 0, quantity: 1, tab: 'Details', cart: 0, coupon: '',
+  flavour: 'Mawa Kulfi', productImage: 0, imageZoom: 1, quantity: 1, tab: 'Details', cart: 0, coupon: '',
   couponOpen: true, searchQuery: '', heroSlide: 0, theme: localStorage.getItem('aura-theme') || 'dark',
   document: 'FSSAI licence', auraDownStreak: 0
 };
@@ -110,8 +110,156 @@ const icon = (name) => ({
 const routeLink = (route, label, className = '') => `<a href="#/${route}" class="${className}" data-route="${route}">${label}</a>`;
 const iconLink = (route, name, label, className = '') => routeLink(route, `${icon(name)}<span class="sr-only">${label}</span>`, `icon-button ${className}`);
 const button = (action, label, className = '', iconName = '') => `<button type="button" class="button ${className}" data-action="${action}">${iconName ? icon(iconName) : ''}<span>${label}</span></button>`;
-const image = (src, alt, className = '') => `<img class="${className}" src="${src}" alt="${alt}" loading="lazy" />`;
-const productPrice = '₹4,199';
+const image = (src, alt, className = '') => src ? `<img class="${className}" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy" />` : '<span class="small">Image unavailable</span>';
+const commerce = { client: createShopifyClient(SHOPIFY_CONFIG), products: {}, cart: null, cartReady: false, loading: true, busy: false, error: '', couponMessage: '' };
+const cartStorageKey = 'aura-shopify-cart:' + SHOPIFY_CONFIG.domain;
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+const formatMoney = money => money ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: money.currencyCode }).format(Number(money.amount)) : '—';
+function selectedVariant(flavour = state.flavour) {
+  const product = commerce.products[flavour];
+  return product?.variants.nodes.find(variant => variant.id === product.selectedVariantId);
+}
+function liveTitle(flavour = state.flavour) { return escapeHtml(commerce.products[flavour]?.title || 'Aura Whey ' + flavour); }
+function livePrice(flavour = state.flavour) { return formatMoney(selectedVariant(flavour)?.price); }
+function purchaseButton(action, label, className = '', iconName = '', flavour = state.flavour) {
+  const available = selectedVariant(flavour)?.availableForSale;
+  const disabled = commerce.loading || commerce.busy || !commerce.cartReady || !available;
+  const text = commerce.loading ? 'Loading…' : !available ? (commerce.products[flavour] ? 'Sold out' : 'Unavailable') : label;
+  return button(action, text, className, iconName).replace('<button ', '<button ' + (disabled ? 'disabled ' : ''));
+}
+function commerceStatus() {
+  return commerce.loading ? '<p class="small" role="status">Loading products…</p>' : commerce.error ? '<div class="result state-invalid" role="alert">We could not update the store. Please try again. ' + button('retry-shopify', 'Retry') + '</div>' : '';
+}
+function variantPicker() {
+  const product = commerce.products[state.flavour];
+  if (!product || product.variants.nodes.length < 2) return '';
+  return '<label class="field">Choose option<select data-variant-select>' + product.variants.nodes.map(variant => '<option value="' + escapeHtml(variant.id) + '" ' + (variant.id === product.selectedVariantId ? 'selected' : '') + '>' + escapeHtml(variant.title) + (variant.availableForSale ? '' : ' — Sold out') + '</option>').join('') + '</select></label>';
+}
+
+function acceptCart(cart) {
+  commerce.cart = cart;
+  state.cart = cart?.totalQuantity || 0;
+  try {
+    if (cart) localStorage.setItem(cartStorageKey, cart.id);
+    else localStorage.removeItem(cartStorageKey);
+  } catch { /* The cart remains usable when browser storage is unavailable. */ }
+  if (cart) {
+    state.coupon = cart.discountCodes.map(code => code.code).join(', ');
+    commerce.couponMessage = cart.discountCodes.map(code => `${code.code}: ${code.applicable ? 'applied' : 'not applicable to this cart'}`).join('. ');
+  }
+}
+
+async function initCommerce() {
+  if (commerce.busy) return;
+  commerce.busy = true;
+  commerce.loading = true;
+  commerce.error = '';
+  render();
+  try {
+    const products = await commerce.client.products();
+    for (const [flavour, product] of Object.entries(products)) {
+      const previous = commerce.products[flavour]?.selectedVariantId;
+      product.selectedVariantId = product.variants.nodes.find(variant => variant.id === previous)?.id || product.variants.nodes.find(variant => variant.availableForSale)?.id || product.variants.nodes[0]?.id;
+      const urls = product.images.nodes.map(img => img.url);
+      product.variants.nodes.forEach(variant => { if (variant.image && !urls.includes(variant.image.url)) urls.push(variant.image.url); });
+      if (!urls.length && product.featuredImage) urls.push(product.featuredImage.url);
+      // Keep the supplied Rich Chocolate gallery artwork as the source of truth.
+      // Shopify may return alternate CDN crops (often 2:3), which would replace
+      // the square product-card images at runtime. Other flavours can still use
+      // their live Shopify gallery when available.
+      if (flavour !== 'Rich Chocolate') productFlavours[flavour].images = urls;
+    }
+    commerce.products = products;
+    state.productImage = 0;
+    let id;
+    try { id = localStorage.getItem(cartStorageKey); } catch { id = null; }
+    id = id || commerce.cart?.id;
+    if (id) acceptCart(await commerce.client.cart(id));
+    commerce.cartReady = true;
+  } catch (error) {
+    commerce.error = error.message;
+    console.warn('Shopify:', error.message);
+  } finally {
+    commerce.loading = false;
+    commerce.busy = false;
+    render();
+  }
+}
+
+async function cartOperation(operation, after) {
+  if (commerce.busy || commerce.loading || !commerce.cartReady) return;
+  commerce.busy = true;
+  commerce.error = '';
+  render();
+  try {
+    const result = await operation();
+    acceptCart(result.cart);
+    if (result.warnings.length) showToast(result.warnings.map(warning => warning.message).join(' '));
+    commerce.busy = false;
+    render();
+    if (after && !result.warnings.length) await after();
+  } catch (error) {
+    commerce.error = error.message;
+    console.warn('Shopify:', error.message);
+    showToast('Could not update your cart. Please retry.');
+  } finally { commerce.busy = false; render(); }
+}
+
+async function addShopifyProduct(flavour, quantity, buyNow = false) {
+  const variant = selectedVariant(flavour);
+  if (!variant?.availableForSale || !Number.isInteger(quantity) || quantity < 1) return;
+  await cartOperation(() => {
+    const lines = [{ merchandiseId: variant.id, quantity }];
+    return commerce.cart ? commerce.client.add(commerce.cart.id, lines) : commerce.client.create(lines, state.coupon ? [state.coupon] : []);
+  }, () => buyNow ? openShopifyCheckout() : navigate('cart'));
+}
+
+async function changeCartLine(action, id) {
+  const line = commerce.cart?.lines.nodes.find(item => item.id === id);
+  if (!line) return;
+  const quantity = line.quantity + (action === 'line-up' ? 1 : -1);
+  if (action !== 'line-remove' && quantity < 1) return;
+  await cartOperation(() => action === 'line-remove'
+    ? commerce.client.remove(commerce.cart.id, [id])
+    : commerce.client.update(commerce.cart.id, [{ id, quantity }]), () => {
+      if (action === 'line-remove') return;
+      const updated = commerce.cart.lines.nodes.find(item => item.id === id);
+      if (!updated || updated.quantity === line.quantity) return;
+      if (action === 'line-up') state.auraDownStreak = 0;
+      else state.auraDownStreak += 1;
+      showToast(action === 'line-up' ? `+${updated.quantity * 1000} AURA` : `−${state.auraDownStreak * 1000} AURA`);
+    });
+}
+
+async function applyShopifyCoupon(code) {
+  if (commerce.busy || code.length > 100) return;
+  if (!commerce.cart) {
+    state.coupon = code;
+    commerce.couponMessage = code ? 'Code saved; Shopify will validate it when you add an item.' : 'Coupon cleared.';
+    render();
+    return;
+  }
+  await cartOperation(() => commerce.client.discount(commerce.cart.id, code ? [code] : []));
+}
+
+async function openShopifyCheckout() {
+  if (commerce.busy || !commerce.cart?.totalQuantity) return;
+  commerce.busy = true;
+  commerce.error = '';
+  render();
+  try {
+    const cart = await commerce.client.cart(commerce.cart.id);
+    acceptCart(cart);
+    if (!cart?.totalQuantity) { navigate('cart'); return; }
+    const url = new URL(cart.checkoutUrl);
+    if (url.protocol !== 'https:') throw new Error('Shopify returned an invalid checkout URL.');
+    window.location.assign(url.href);
+  } catch (error) {
+    commerce.error = error.message;
+    console.warn('Shopify:', error.message);
+    showToast('Checkout could not be opened. Please retry.');
+  } finally { commerce.busy = false; render(); }
+}
 
 function brand() {
   return routeLink('home', '<img class="brand-logo" src="assets/aura-whey-logo.jpeg" alt="Aura Whey — Fuel your aura" width="1254" height="1254" decoding="async">', 'brand');
@@ -165,9 +313,9 @@ function shell(content) {
       </header>
       <div class="overlay" data-action="close-menu"></div>
       <aside class="mobile-panel" id="mobile-menu" aria-label="Mobile navigation" aria-hidden="true" inert>
-        <div class="mobile-panel-top">${brand()}<button class="icon-button menu-close" type="button" data-action="close-menu" aria-label="Close menu">${icon('close')}</button></div>
+        <div class="mobile-panel-top">${brand()}<div class="mobile-panel-actions">${routeLink('cart', `${icon('bag')}<span class="cart-count" aria-label="${state.cart} items in cart">${state.cart}</span><span class="sr-only">Cart</span>`, 'icon-button cart-link mobile-cart-link')}<button class="icon-button menu-close" type="button" data-action="close-menu" aria-label="Close menu">${icon('close')}</button></div></div>
         <button type="button" class="mobile-search-trigger" data-action="open-search">${icon('search')} Search products</button>
-        <nav>${nav}${routeLink('account', 'Sign in / Log in')}${routeLink('cart', `Cart <span class="cart-count">${state.cart}</span>`)}</nav>
+        <nav>${nav}${routeLink('account', 'Sign in / Log in')}</nav>
         <div class="mobile-theme"><span>Appearance</span><button type="button" class="text-button" data-action="toggle-theme">${state.theme === 'dark' ? 'Light mode' : 'Dark mode'}</button></div>
       </aside>
       <main tabindex="-1">${content}${shopInvitation()}${storeFaq()}</main>
@@ -280,18 +428,18 @@ function productCard(flavour) {
   return `<article class="card product-card ${productFlavours[flavour].theme}">
     <button type="button" class="product-card-media" data-action="select-${flavour}" aria-label="View Aura Whey ${flavour}">${image(productFlavours[flavour].images[0], `Aura Whey ${flavour}`)}</button>
     <div class="product-card-body">
-      <div class="product-card-top"><h3>Aura Whey <span>${flavour}</span></h3><strong>${productPrice}</strong></div>
+      <div class="product-card-top"><h3>${liveTitle(flavour)}</h3><strong>${livePrice(flavour)}</strong></div>
       <div class="product-meta"><span>1 kg</span><span>28 servings</span></div>
-      <p>${description}</p>
+      <p>${escapeHtml(commerce.products[flavour]?.description || description)}</p>
       <div class="product-card-macros"><span><b>24g</b> Protein</span><span><b>5.7g</b> BCAAs</span><span><b>28</b> Servings</span></div>
-      <div class="button-row">${button(`add-flavour-${flavour}`, 'Add to cart', 'primary', 'bag')}${button(`select-${flavour}`, 'View product', 'secondary')}</div>
+      <div class="button-row">${purchaseButton(`add-flavour-${flavour}`, 'Add to cart', 'primary', 'bag', flavour)}${button(`select-${flavour}`, 'View product', 'secondary')}</div>
     </div>
   </article>`;
 }
 
 function couponEntry() {
-  const result = state.coupon === 'DISC5' ? 'DISC5 is applied. Your 5% offer will be reflected at checkout.' : state.coupon ? 'That code is not recognised. Try DISC5.' : 'Have a code? Apply it before checkout.';
-  return `<form class="coupon-form" data-form="coupon"><label class="field">Coupon code<input name="coupon" value="${state.coupon}" placeholder="Enter coupon code" /></label><button type="submit" class="button">Apply</button></form><div class="coupon-result" aria-live="polite">${result}</div>`;
+  const result = commerce.couponMessage || (state.coupon ? 'Code saved; Shopify will validate it when you add an item.' : 'Have a code? Apply it before checkout.');
+  return `<form class="coupon-form" data-form="coupon"><label class="field">Coupon code<input name="coupon" maxlength="100" value="${escapeHtml(state.coupon)}" placeholder="Enter coupon code" /></label><button type="submit" class="button" ${commerce.busy ? 'disabled' : ''}>Apply</button></form><div class="coupon-result" aria-live="polite">${escapeHtml(result)}</div>`;
 }
 
 function productInside() {
@@ -348,11 +496,15 @@ function storeFaq() {
 
 function floatingPurchaseBar() {
   const productImage = productFlavours[state.flavour].images[0];
-  return `<aside class="floating-purchase" id="floating-purchase" aria-label="Quick purchase" aria-hidden="true"><div class="floating-purchase-inner"><div class="floating-product-summary">${image(productImage, `Aura Whey ${state.flavour}`)}<div><strong>Aura Whey ${state.flavour}</strong><span>1 kg · 28 servings</span></div><b>${productPrice}</b></div><div class="floating-purchase-actions">${button('add-cart', 'Add to cart', 'floating-add')}${button('buy-now', 'Buy now', 'primary floating-buy')}</div></div></aside>`;
+  return `<aside class="floating-purchase" id="floating-purchase" aria-label="Quick purchase" aria-hidden="true"><div class="floating-purchase-inner"><div class="floating-product-summary">${image(productImage, `Aura Whey ${state.flavour}`)}<div><strong>${liveTitle()}</strong><span>1 kg · 28 servings</span></div><b>${livePrice()}</b></div><div class="floating-purchase-actions">${purchaseButton('add-cart', 'Add to cart', 'floating-add')}${purchaseButton('buy-now', 'Buy now', 'primary floating-buy')}</div></div></aside>`;
+}
+
+function productZoomControls() {
+  return `<div class="product-zoom-controls" aria-label="Product image zoom controls">${button('zoom-out', '−', '', '').replace('<button ', '<button aria-label="Zoom out" ')}${button('zoom-reset', '100%', '', '').replace('<button ', '<button aria-label="Reset image zoom" ')}${button('zoom-in', '+', '', '').replace('<button ', '<button aria-label="Zoom in" ')}</div>`;
 }
 
 function shop() {
-  return `<div class="product-page ${productFlavours[state.flavour].theme}"><h1 class="page-title">Aura Whey Protein</h1><div class="product-layout"><section class="product-gallery"><div class="product-main-image">${image(productFlavours[state.flavour].images[state.productImage], `${state.flavour} Aura Whey product`)}</div><div class="thumbnail-row" aria-label="Product images">${productFlavours[state.flavour].images.map((src, index) => `<button type="button" class="thumbnail" data-action="product-image-${index}" aria-label="View ${state.flavour} image ${index + 1}" aria-pressed="${state.productImage === index}">${image(src, `${state.flavour}, image ${index + 1}`)}</button>`).join('')}</div></section><section class="purchase-panel"><p class="breadcrumb">Shop / Whey protein</p><h2>Aura Whey <span>${state.flavour}</span></h2><div class="price">${productPrice}<span>Inclusive of taxes</span></div><p>1 kg · 28 servings · 35 g serving size</p><div class="flavour-picker"><span>Choose flavour</span><div class="button-row"><button type="button" class="flavour ${state.flavour === 'Mawa Kulfi' ? 'active' : ''}" data-action="select-Mawa Kulfi">Mawa Kulfi</button><button type="button" class="flavour ${state.flavour === 'Rich Chocolate' ? 'active' : ''}" data-action="select-Rich Chocolate">Rich Chocolate</button></div></div><div class="coupon-entry">${couponEntry()}</div><div class="product-actions">${auraQuantity()}<div class="button-row">${button('add-cart', 'Add to cart', 'floating-add', 'bag')}${button('buy-now', 'Buy now', 'primary')}${routeLink('quality', 'View quality documents', 'button-link secondary')}</div></div>${productInside()}</section></div>${productReviews()}${nutritionTrust()}${floatingPurchaseBar()}</div>`;
+  return `<div class="product-page ${productFlavours[state.flavour].theme}">${commerceStatus()}<h1 class="page-title">Aura Whey Protein</h1><div class="product-layout"><section class="product-gallery"><div class="product-main-image">${productZoomControls()}${image(productFlavours[state.flavour].images[state.productImage], `${state.flavour} Aura Whey product`, 'product-main-photo')}</div><div class="thumbnail-row" aria-label="Product images">${productFlavours[state.flavour].images.map((src, index) => `<button type="button" class="thumbnail" data-action="product-image-${index}" aria-label="View ${state.flavour} image ${index + 1}" aria-pressed="${state.productImage === index}">${image(src, `${state.flavour}, image ${index + 1}`)}</button>`).join('')}</div></section><section class="purchase-panel"><p class="breadcrumb">Shop / Whey protein</p><h2>${liveTitle()}</h2><div class="price">${livePrice()}<span>Inclusive of taxes</span></div><p>1 kg · 28 servings · 35 g serving size</p><div class="flavour-picker"><span>Choose flavour</span><div class="button-row"><button type="button" class="flavour ${state.flavour === 'Mawa Kulfi' ? 'active' : ''}" data-action="select-Mawa Kulfi">Mawa Kulfi</button><button type="button" class="flavour ${state.flavour === 'Rich Chocolate' ? 'active' : ''}" data-action="select-Rich Chocolate">Rich Chocolate</button></div></div>${variantPicker()}<p role="status">${selectedVariant()?.availableForSale ? 'In stock' : commerce.loading ? 'Checking availability…' : 'Unavailable'}</p><p>${escapeHtml(commerce.products[state.flavour]?.description || '')}</p><div class="coupon-entry">${couponEntry()}</div><div class="product-actions">${auraQuantity()}<div class="button-row">${purchaseButton('add-cart', 'Add to cart', 'floating-add', 'bag')}${purchaseButton('buy-now', 'Buy now', 'primary')}${routeLink('quality', 'View quality documents', 'button-link secondary')}</div></div>${productInside()}</section></div>${productReviews()}${nutritionTrust()}${floatingPurchaseBar()}</div>`;
 }
 
 function auraQuantity() {
@@ -394,29 +546,19 @@ function showAuraBurst(control, text) {
   burst.addEventListener('animationend', () => burst.remove(), { once: true });
 }
 
-function updateCartQuantity(action) {
-  if (action === 'quantity-down' && state.quantity === 1) return;
-  state.quantity += action === 'quantity-up' ? 1 : -1;
-  const feedback = auraFeedback(action);
-  render();
-  showAuraBurst(document.querySelector('.cart-item .quantity'), feedback);
-}
-
-function totals() {
-  const subtotal = 4199 * state.quantity;
-  const discount = state.coupon === 'DISC5' ? Math.round(subtotal * .05) : 0;
-  return { subtotal, discount, total: subtotal - discount, format: (value) => `₹${value.toLocaleString('en-IN')}` };
-}
-
 function cart() {
-  const hasCart = state.cart > 0;
-  if (!hasCart) return `<section class="empty-state"><div><p class="hero-overline">Your cart</p><h1>Nothing here yet.</h1><p>Pick a flavour to begin your Aura Whey routine.</p>${routeLink('shop', 'Shop whey protein', 'button-link primary')}</div></section>`;
-  const amount = totals();
-  const productImage = state.flavour === 'Mawa Kulfi' ? assets.mawa : assets.chocolate;
-  return `<h1 class="page-title">Your cart</h1><div class="cart-layout"><section><article class="cart-item"><div class="cart-image">${image(productImage, `Aura Whey ${state.flavour}`)}</div><div><h2>Aura Whey ${state.flavour}</h2><p>1 kg · 28 servings</p><strong class="item-price">${productPrice}</strong><div class="quantity"><span>Quantity</span><button class="quantity-button" type="button" data-action="quantity-down" aria-label="Decrease quantity">−</button><span>${state.quantity}</span><button class="quantity-button" type="button" data-action="quantity-up" aria-label="Increase quantity">+</button></div></div>${button('remove-cart', 'Remove')}</article></section><aside class="summary"><h2>Order summary</h2><div class="summary-row"><span>Subtotal</span><span>${amount.format(amount.subtotal)}</span></div>${amount.discount ? `<div class="summary-row discount"><span>DISC5</span><span>−${amount.format(amount.discount)}</span></div>` : ''}<div class="summary-row"><span>Shipping</span><span>Calculated at checkout</span></div><div class="summary-row"><strong>Total</strong><strong>${amount.format(amount.total)}</strong></div><div class="cart-coupon">${couponEntry()}</div><p>${button('checkout', 'Secure checkout', 'primary')}</p><p class="small">Checkout is completed securely through Shopify.</p></aside></div>`;
+  const lines = commerce.cart?.lines.nodes || [];
+  if (!lines.length) return `<section class="empty-state"><div>${commerceStatus()}<p class="hero-overline">Your cart</p><h1>Nothing here yet.</h1><p>Pick a flavour to begin your Aura Whey routine.</p>${routeLink('shop', 'Shop whey protein', 'button-link primary')}</div></section>`;
+  const cost = commerce.cart.cost;
+  return `<h1 class="page-title">Your cart</h1>${commerceStatus()}<div class="cart-layout"><section>${lines.map(line => {
+    const variant = line.merchandise;
+    return `<article class="cart-item"><div class="cart-image">${variant.image ? image(variant.image.url, variant.image.altText || variant.product.title) : ''}</div><div><h2>${escapeHtml(variant.product.title)}</h2><p>${variant.title === 'Default Title' ? '' : escapeHtml(variant.title)}</p><strong class="item-price">${formatMoney(variant.price)}</strong><div class="quantity"><span>Quantity</span><button class="quantity-button" type="button" data-action="line-down" data-line-id="${escapeHtml(line.id)}" aria-label="Decrease quantity" ${commerce.busy || line.quantity <= 1 ? 'disabled' : ''}>−</button><span>${line.quantity}</span><button class="quantity-button" type="button" data-action="line-up" data-line-id="${escapeHtml(line.id)}" aria-label="Increase quantity" ${commerce.busy ? 'disabled' : ''}>+</button></div><p>Line total: ${formatMoney(line.cost.totalAmount)}</p></div><button class="button" type="button" data-action="line-remove" data-line-id="${escapeHtml(line.id)}" ${commerce.busy ? 'disabled' : ''}>Remove</button></article>`;
+  }).join('')}</section><aside class="summary"><h2>Order summary</h2><div class="summary-row"><span>Subtotal</span><span>${formatMoney(cost.subtotalAmount)}</span></div>${commerce.cart.discountCodes.map(code => `<div class="summary-row"><span>${escapeHtml(code.code)}</span><span>${code.applicable ? 'Applied' : 'Not applicable'}</span></div>`).join('')}<div class="summary-row"><span>Shipping</span><span>Calculated at checkout</span></div><div class="summary-row"><strong>Estimated total</strong><strong>${formatMoney(cost.totalAmount)}</strong></div><div class="cart-coupon">${couponEntry()}</div><p><button class="button primary" type="button" data-action="checkout" ${commerce.busy ? 'disabled' : ''}>Secure checkout</button></p><p class="small">Final shipping and taxes are confirmed at checkout.</p></aside></div>`;
 }
 
-function checkout() { return `<section class="handoff"><div class="handoff-icon">${icon('bag')}</div><p class="hero-overline">Secure checkout</p><h1>Ready for Shopify checkout.</h1><p>Your delivery address, payment method, taxes, and order confirmation are handled in the secure Shopify checkout.</p><div class="button-row">${routeLink('cart', 'Back to cart', 'button-link')}${button('shopify-checkout', 'Continue to checkout', 'primary')}</div><div id="checkout-result" aria-live="polite"></div></section>`; }
+function checkout() {
+  return `<section class="handoff"><div class="handoff-icon">${icon('bag')}</div><p class="hero-overline">Secure checkout</p><h1>Complete your order.</h1><p>Continue to secure checkout for delivery and payment.</p>${commerceStatus()}<div class="button-row">${routeLink('cart', 'Back to cart', 'button-link')}${button('shopify-checkout', 'Continue to checkout', 'primary')}</div></section>`;
+}
 
 const documents = [
   ['FSSAI licence', 'Food safety licence', 'Manufacturer licence — supplied renewal document.', 'fssai.pdf'],
@@ -458,7 +600,7 @@ function updateSearchResults() {
   state.searchQuery = input.value.slice(0, 100);
   const matches = matchingProducts(state.searchQuery);
   document.querySelector('#search-count').textContent = matches.length ? (state.searchQuery.trim() ? matches.length + ' matching product' + (matches.length === 1 ? '' : 's') : 'Explore both flavours') : 'No products found. Try “whey”, “kulfi” or “chocolate”.';
-  document.querySelector('#search-products').innerHTML = matches.map(flavour => `<button type="button" class="search-product ${productFlavours[flavour].theme}" data-action="select-${flavour}">${image(productFlavours[flavour].images[0], 'Aura Whey ' + flavour)}<span><strong>Aura Whey</strong><span>${flavour}</span><small>1 kg · ${productPrice}</small></span><span class="search-product-arrow" aria-hidden="true">↗</span></button>`).join('');
+  document.querySelector('#search-products').innerHTML = matches.map(flavour => `<button type="button" class="search-product ${productFlavours[flavour].theme}" data-action="select-${flavour}">${image(productFlavours[flavour].images[0], 'Aura Whey ' + flavour)}<span><strong>Aura Whey</strong><span>${flavour}</span><small>1 kg · ${livePrice(flavour)}</small></span><span class="search-product-arrow" aria-hidden="true">↗</span></button>`).join('');
 }
 
 function openSearch() {
@@ -625,6 +767,7 @@ function applyTheme() {
 }
 let heroTimer = null;
 let purchaseBarObserver = null;
+let purchaseBarFallbackCleanup = null;
 
 function setHeroSlide(index) {
   const count = heroSlides.length;
@@ -711,28 +854,42 @@ function initHeroCarousel() {
 function initFloatingPurchaseBar() {
   purchaseBarObserver?.disconnect();
   purchaseBarObserver = null;
-  const purchaseActions = document.querySelector('.product-actions');
+  purchaseBarFallbackCleanup?.();
+  purchaseBarFallbackCleanup = null;
+  const purchaseGallery = document.querySelector('.product-main-image');
   const purchaseBar = document.querySelector('#floating-purchase');
-  if (!purchaseActions || !purchaseBar) return;
+  if (!purchaseGallery || !purchaseBar) return;
 
   const setVisible = visible => {
     purchaseBar.classList.toggle('is-visible', visible);
     purchaseBar.setAttribute('aria-hidden', String(!visible));
   };
+  setVisible(false);
 
   if (!('IntersectionObserver' in window)) {
-    setVisible(true);
+    const headerHeight = Math.ceil(document.querySelector('.site-header')?.getBoundingClientRect().height || 0);
+    const updateVisibility = () => {
+      const bounds = purchaseGallery.getBoundingClientRect();
+      setVisible(bounds.bottom <= headerHeight);
+    };
+    window.addEventListener('scroll', updateVisibility, { passive: true });
+    window.addEventListener('resize', updateVisibility);
+    updateVisibility();
+    purchaseBarFallbackCleanup = () => {
+      window.removeEventListener('scroll', updateVisibility);
+      window.removeEventListener('resize', updateVisibility);
+    };
     return;
   }
 
   const headerHeight = Math.ceil(document.querySelector('.site-header')?.getBoundingClientRect().height || 0);
   purchaseBarObserver = new window.IntersectionObserver(([entry]) => {
-    setVisible(!(entry.isIntersecting && entry.intersectionRatio >= .15));
-  }, { threshold: [.15], rootMargin: `-${headerHeight}px 0px -72px 0px` });
-  purchaseBarObserver.observe(purchaseActions);
+    setVisible(!entry.isIntersecting);
+  }, { threshold: 0, rootMargin: `-${headerHeight}px 0px 0px 0px` });
+  purchaseBarObserver.observe(purchaseGallery);
 }
 
-function render() { document.body.classList.remove('search-open'); applyTheme(); shell((views[currentRoute()] || home)()); bindEvents(); initHeroCarousel(); initFloatingPurchaseBar(); showSavedReview(); }
+function render() { document.body.classList.remove('search-open'); document.body.classList.remove('menu-open'); applyTheme(); shell((views[currentRoute()] || home)()); bindEvents(); initHeroCarousel(); initFloatingPurchaseBar(); showSavedReview(); }
 function navigate(route) { location.hash = `/${route}`; }
 
 function setMobileMenu(open) {
@@ -758,7 +915,7 @@ document.addEventListener('keydown', event => {
     if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   }
 });
-window.addEventListener('hashchange', () => document.body.classList.remove('menu-open'));
+window.addEventListener('hashchange', () => { if (document.querySelector('.mobile-panel.open')) setMobileMenu(false); });
 
 function bindEvents() {
   const dialog = document.querySelector('#search-dialog');
@@ -771,6 +928,14 @@ function bindEvents() {
   });
   document.querySelectorAll('[data-route]').forEach(link => link.addEventListener('click', () => setTimeout(() => document.querySelector('main')?.focus(), 0)));
   document.querySelectorAll('[data-action]').forEach(element => element.addEventListener('click', () => handleAction(element.dataset.action, element)));
+  document.querySelector('[data-variant-select]')?.addEventListener('change', event => {
+    commerce.products[state.flavour].selectedVariantId = event.target.value;
+    const variant = selectedVariant();
+    const index = productFlavours[state.flavour].images.indexOf(variant.image?.url);
+    state.productImage = Math.max(0, index);
+    state.quantity = 1;
+    render();
+  });
   document.querySelectorAll('form[data-form]').forEach(form => form.addEventListener('submit', handleForm));
 }
 
@@ -791,11 +956,9 @@ function showToast(message) {
 function handleAction(action, element) {
   if (action === 'open-search') return openSearch();
   if (action === 'close-search') return closeSearch();
-  if (action === 'apply-coupon') {
-    state.coupon = 'DISC5';
-    showToast('Coupon "DISC5" applied! 5% discount active.');
-    return render();
-  }
+  if (action === 'apply-coupon') return applyShopifyCoupon('DISC5');
+  if (action === 'retry-shopify') return initCommerce();
+  if (action.startsWith('line-')) return changeCartLine(action, element.dataset.lineId);
   if (action === 'toggle-theme') { state.theme = state.theme === 'dark' ? 'light' : 'dark'; localStorage.setItem('aura-theme', state.theme); return render(); }
   if (action === 'toggle-coupon') { state.couponOpen = false; return render(); }
   if (action === 'show-coupon') { state.couponOpen = true; return render(); }
@@ -807,24 +970,37 @@ function handleAction(action, element) {
   if (action === 'open-menu') return setMobileMenu(true);
   if (action === 'close-menu') return setMobileMenu(false);
   if (action === 'go-shop') return navigate('shop');
-  if (action.startsWith('select-')) { state.flavour = action.replace('select-', ''); state.productImage = 0; return currentRoute() === 'shop' ? render() : navigate('shop'); }
+  if (action === 'zoom-in' || action === 'zoom-out' || action === 'zoom-reset') {
+    state.imageZoom = action === 'zoom-reset' ? 1 : Math.min(2.5, Math.max(1, state.imageZoom + (action === 'zoom-in' ? .25 : -.25)));
+    const galleryImage = document.querySelector('.product-main-image img');
+    if (galleryImage) {
+      galleryImage.style = galleryImage.style || {};
+      galleryImage.style.transform = `scale(${state.imageZoom})`;
+    }
+    const reset = document.querySelector('[data-action="zoom-reset"]');
+    reset?.querySelector?.('span') && (reset.querySelector('span').textContent = `${Math.round(state.imageZoom * 100)}%`);
+    return;
+  }
+  if (action.startsWith('select-')) { state.flavour = action.replace('select-', ''); state.productImage = 0; state.imageZoom = 1; return currentRoute() === 'shop' ? render() : navigate('shop'); }
   if (action.startsWith('product-image-')) {
     state.productImage = Number(action.replace('product-image-', ''));
+    state.imageZoom = 1;
     const galleryImage = document.querySelector('.product-main-image img');
     galleryImage.src = productFlavours[state.flavour].images[state.productImage];
     galleryImage.alt = `Aura Whey ${state.flavour}, image ${state.productImage + 1}`;
+    galleryImage.style = galleryImage.style || {};
+    galleryImage.style.transform = 'scale(1)';
+    const reset = document.querySelector('[data-action="zoom-reset"]');
+    reset?.querySelector?.('span') && (reset.querySelector('span').textContent = '100%');
     document.querySelectorAll('.thumbnail[data-action]').forEach(thumbnail => thumbnail.setAttribute('aria-pressed', String(thumbnail === element)));
     return;
   }
-  if (action.startsWith('add-flavour-')) { state.flavour = action.replace('add-flavour-', ''); state.productImage = 0; state.cart = 1; return navigate('cart'); }
+  if (action.startsWith('add-flavour-')) return addShopifyProduct(action.replace('add-flavour-', ''), 1);
   if (action.startsWith('tab-')) { state.tab = action.replace('tab-', ''); return render(); }
-  if (action === 'add-cart') { state.cart = 1; return navigate('cart'); }
-  if (action === 'buy-now') { state.cart = 1; return navigate('checkout'); }
-  if (action === 'remove-cart') { state.cart = 0; state.quantity = 1; state.auraDownStreak = 0; return render(); }
+  if (action === 'add-cart') return addShopifyProduct(state.flavour, state.quantity);
+  if (action === 'buy-now') return addShopifyProduct(state.flavour, state.quantity, true);
   if (action === 'aura-up' || action === 'aura-down') return updateAuraQuantity(action, element);
-  if (action === 'quantity-up' || action === 'quantity-down') return updateCartQuantity(action);
-  if (action === 'checkout') return navigate('checkout');
-  if (action === 'shopify-checkout') { document.querySelector('#checkout-result').innerHTML = '<div class="result state-valid"><strong>Checkout handoff ready</strong><p>Connect your Shopify Storefront API or checkout URL here when the store credentials are available.</p></div>'; return; }
+  if (action === 'checkout' || action === 'shopify-checkout') return openShopifyCheckout();
   if (action.startsWith('view-document-')) { state.document = action.replace('view-document-', ''); return navigate('document'); }
   if (action.startsWith('faq-')) { const panel = element.nextElementSibling; const expanded = element.getAttribute('aria-expanded') === 'true'; element.setAttribute('aria-expanded', String(!expanded)); panel.hidden = expanded; return; }
 }
@@ -847,7 +1023,7 @@ function handleForm(event) {
     } catch { result.textContent = 'Browser storage is unavailable. Your review has not been saved; please keep a copy of your text.'; }
     return;
   }
-  if (form.dataset.form === 'coupon') { state.coupon = form.elements.coupon.value.trim().toUpperCase(); return render(); }
+  if (form.dataset.form === 'coupon') return applyShopifyCoupon(form.elements.coupon.value.trim().toUpperCase());
   if (form.dataset.form === 'authenticate') {
     const value = form.elements.code.value.trim().toUpperCase();
     const results = { 'AURA-2026-001': ['state-valid', 'Pack verified', 'This demonstration code is accepted. In production, this will return your product’s verification record.'], 'AURA-2026-USED': ['state-invalid', 'This code has already been checked', 'Please contact support if you believe your pack needs another review.'] };
@@ -872,7 +1048,8 @@ window.addEventListener('hashchange', () => {
   window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 });
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', render);
+  document.addEventListener('DOMContentLoaded', () => { render(); initCommerce(); });
 } else {
   render();
+  initCommerce();
 }
