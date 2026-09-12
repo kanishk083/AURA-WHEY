@@ -39,7 +39,7 @@ const heroSlides = [
     alt: 'Aura Whey Rich Chocolate and Mawa Kulfi protein tubs',
     desktopImage: assets.hero[0],
     mobileImage: '',
-    link: '#/shop'
+    link: '/shop'
   },
   {
     id: 'rich-chocolate',
@@ -47,7 +47,7 @@ const heroSlides = [
     alt: 'Aura Whey Rich Chocolate protein promotional banner',
     desktopImage: assets.hero[1],
     mobileImage: '',
-    link: '#/shop'
+    link: '/shop'
   },
   {
     id: 'mawa-kulfi',
@@ -55,7 +55,7 @@ const heroSlides = [
     alt: 'Aura Whey Mawa Kulfi protein promotional banner',
     desktopImage: assets.hero[2],
     mobileImage: '',
-    link: '#/shop'
+    link: '/shop'
   },
   {
     id: 'training-benefits',
@@ -63,7 +63,7 @@ const heroSlides = [
     alt: 'Aura Whey protein tubs with athlete and product benefits',
     desktopImage: assets.hero[3],
     mobileImage: '',
-    link: '#/shop'
+    link: '/shop'
   },
   {
     id: 'performance-routine',
@@ -71,7 +71,7 @@ const heroSlides = [
     alt: 'Aura Whey protein tubs with athlete and performance benefits',
     desktopImage: assets.hero[4],
     mobileImage: '',
-    link: '#/shop'
+    link: '/shop'
   }
 ];
 
@@ -111,7 +111,7 @@ const icon = (name) => ({
   youtube: svg('<path d="M20.4 7.1c-.2-1-1-1.8-2-2C16.6 4.7 7.4 4.7 5.6 5.1c-1 .2-1.8 1-2 2-.4 1.8-.4 8 0 9.8.2 1 1 1.8 2 2 1.8.4 11 .4 12.8 0 1-.2 1.8-1 2-2 .4-1.8.4-8 0-9.8Z"></path><path d="m10 9 5 3-5 3Z"></path>')
 }[name] || '');
 
-const routeLink = (route, label, className = '') => `<a href="#/${route}" class="${className}" data-route="${route}">${label}</a>`;
+const routeLink = (route, label, className = '') => `<a href="/${route}" class="${className}" data-route="${route}">${label}</a>`;
 const iconLink = (route, name, label, className = '') => routeLink(route, `${icon(name)}<span class="sr-only">${label}</span>`, `icon-button ${className}`);
 const button = (action, label, className = '', iconName = '') => `<button type="button" class="button ${className}" data-action="${action}">${iconName ? icon(iconName) : ''}<span>${label}</span></button>`;
 const image = (src, alt, className = '') => src ? `<img class="${className}" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="${className === 'product-main-photo' ? 'eager' : 'lazy'}" decoding="async" />` : '<span class="small">Image unavailable</span>';
@@ -341,7 +341,7 @@ function heroBannerCarousel() {
             const isActive = index === state.heroSlide;
             return `
               <div class="hero-slide ${isActive ? 'is-active' : ''}" data-slide-index="${index}" role="group" aria-roledescription="slide" aria-label="${slide.title}" aria-hidden="${!isActive}">
-                <a href="${slide.link || '#/shop'}" class="hero-slide-link" tabindex="${isActive ? '0' : '-1'}">
+                <a href="${slide.link || '/shop'}" class="hero-slide-link" tabindex="${isActive ? '0' : '-1'}">
                   <picture class="hero-picture">
                     ${slide.mobileImage ? `<source media="(max-width: 768px)" srcset="${slide.mobileImage}">` : ''}
                     <img class="hero-banner-img" src="${slide.desktopImage}" alt="${slide.alt || slide.title}" width="1920" height="730" decoding="async" loading="${index === 0 ? 'eager' : 'lazy'}" />
@@ -458,7 +458,7 @@ function nutritionTrust() {
     <div class="section-head"><div><h2>Know what goes into your routine.</h2><div class="gold-rule"></div></div><p>Nutrition at a glance. Quality information within reach.</p></div>
     <div class="nutrition-trust-stats"><div><strong>24<span>g</span></strong><p>Protein per serving</p></div><div><strong>5.7<span>g</span></strong><p>BCAAs per serving</p></div><div><strong>35<span>g</span></strong><p>Serving size</p></div><div><strong>28</strong><p>Servings per pack</p></div></div>
     <div class="certification-heading"><h3>Food safety & manufacturing</h3><p>Explore the certification categories in our quality library.</p></div>
-    <div class="certification-strip">${[['FSSAI', 'Food safety licence'], ['ISO 22000', 'Food safety management'], ['GMP', 'Manufacturing practices'], ['HACCP', 'Hazard control']].map(([name, description]) => `<a class="certification-item" href="#/quality"><span class="certification-symbol" aria-hidden="true">${icon('file')}</span><strong>${name}</strong><span>${description}</span></a>`).join('')}</div>
+    <div class="certification-strip">${[['FSSAI', 'Food safety licence'], ['ISO 22000', 'Food safety management'], ['GMP', 'Manufacturing practices'], ['HACCP', 'Hazard control']].map(([name, description]) => `<a class="certification-item" href="/quality"><span class="certification-symbol" aria-hidden="true">${icon('file')}</span><strong>${name}</strong><span>${description}</span></a>`).join('')}</div>
     <div class="nutrition-trust-bottom"><p>Read the pack label for full nutrition and ingredient details.</p>${routeLink('quality', 'Explore quality information', 'text-link')}</div>
   </div></section>`;
 }
@@ -622,7 +622,7 @@ function account() { return `<section class="page-intro compact"><p class="hero-
 function blog() { return `<section class="page-intro"><p class="hero-overline">Aura journal</p><h1>Train with clarity.</h1><p>Practical reads for choosing your product and making your routine easier to keep.</p></section><section class="section"><div class="featured-post"><div class="featured-image">${image(posts[0].image, posts[0].alt)}</div><div><p class="hero-overline">Featured guide</p><h2>${posts[0].title}</h2><p>${posts[0].excerpt}</p>${routeLink(`article/${posts[0].slug}`, 'Read the guide', 'button-link primary')}</div></div></section><section class="section"><div class="section-inner"><div class="grid grid-3">${[0, 1, 2].map(blogCard).join('')}</div></div></section>`; }
 
 function article() {
-  const slug = location.hash.split('/')[2];
+  const slug = location.pathname.split('/')[2];
   const post = posts.find(item => item.slug === slug) || posts[0];
   return `<article class="article"><p>${routeLink('blog', 'Back to journal', 'text-link')}</p><p class="hero-overline">Aura journal</p><h1>${post.title}</h1><p class="article-meta">Aura Whey Journal · 1 minute read</p><div class="article-hero">${image(post.image, post.alt)}</div><div class="article-layout"><div>${post.sections.map(([heading, copy]) => `<section><h2>${heading}</h2><p>${copy}</p></section>`).join('')}</div><aside class="article-aside"><strong>Explore Aura Whey</strong>${routeLink('shop', 'Shop both flavours', 'text-link')}${routeLink('blog', 'More from the journal', 'text-link')}</aside></div></article>`;
 }
@@ -634,7 +634,7 @@ function trackOrder() { return `<section class="page-intro compact"><p class="he
 const faqs = [
   [
     "Which flavours are available?",
-    "Choose Mawa Kulfi for a creamy, dessert-inspired profile or Rich Chocolate for a familiar cocoa flavour. <a href=\"#/shop\">Shop both flavours</a> or <a href=\"#/article/mawa-kulfi-or-rich-chocolate\">read the flavour guide</a>."
+    "Choose Mawa Kulfi for a creamy, dessert-inspired profile or Rich Chocolate for a familiar cocoa flavour. <a href=\"/shop\">Shop both flavours</a> or <a href=\"/article/mawa-kulfi-or-rich-chocolate\">read the flavour guide</a>."
   ],
   [
     "What is the source of protein? Is it natural?",
@@ -642,11 +642,11 @@ const faqs = [
   ],
   [
     "How much protein is in a serving?",
-    "Use the nutrition panel on your particular pack for protein content and serving size. Check the <a href=\"#/shop\">product details</a> alongside the label before choosing your serving."
+    "Use the nutrition panel on your particular pack for protein content and serving size. Check the <a href=\"/shop\">product details</a> alongside the label before choosing your serving."
   ],
   [
     "When should I consume it?",
-    "Choose a convenient time that fits your meals and routine, following the pack directions. A supplement is an addition to a balanced diet. <a href=\"#/article/plan-your-protein-routine\">Explore a simple routine</a>."
+    "Choose a convenient time that fits your meals and routine, following the pack directions. A supplement is an addition to a balanced diet. <a href=\"/article/plan-your-protein-routine\">Explore a simple routine</a>."
   ],
   [
     "How do I prepare it?",
@@ -674,7 +674,7 @@ const faqs = [
   ],
   [
     "Is it manufactured locally or imported?",
-    "Check the manufacturer, country of origin and any importer details printed on your pack. <a href=\"#/contact\">Contact us</a> with a pack photo or batch details if you need help confirming the origin."
+    "Check the manufacturer, country of origin and any importer details printed on your pack. <a href=\"/contact\">Contact us</a> with a pack photo or batch details if you need help confirming the origin."
   ],
   [
     "Is it suitable for vegetarians?",
@@ -718,7 +718,7 @@ const faqs = [
   ],
   [
     "Can I use it in cooking?",
-    "Follow the pack’s preparation instructions. If cooking or heating guidance is not provided, <a href=\"#/contact\">ask support</a> before using it in a recipe. We have not validated this formula for cooking."
+    "Follow the pack’s preparation instructions. If cooking or heating guidance is not provided, <a href=\"/contact\">ask support</a> before using it in a recipe. We have not validated this formula for cooking."
   ],
   [
     "What is the difference between whey concentrate and isolate?",
@@ -726,19 +726,19 @@ const faqs = [
   ],
   [
     "Which processing method is used?",
-    "We have not confirmed the filtration or processing method for this formula. <a href=\"#/contact\">Contact us</a> for manufacturer information; we do not claim cold processing or a specific filtration technique without documentation."
+    "We have not confirmed the filtration or processing method for this formula. <a href=\"/contact\">Contact us</a> for manufacturer information; we do not claim cold processing or a specific filtration technique without documentation."
   ],
   [
     "Where can I find quality certificates?",
-    "Visit <a href=\"#/quality\">Quality & lab reports</a> for the document categories. Source certificate files are not yet available in this preview. Contact support if you need a certificate before ordering."
+    "Visit <a href=\"/quality\">Quality & lab reports</a> for the document categories. Source certificate files are not yet available in this preview. Contact support if you need a certificate before ordering."
   ],
   [
     "How do I authenticate a pack?",
-    "Open <a href=\"#/authenticate\">Authenticate</a> and follow the pack-code instructions. The current preview uses demonstration codes; it does not verify a real purchase."
+    "Open <a href=\"/authenticate\">Authenticate</a> and follow the pack-code instructions. The current preview uses demonstration codes; it does not verify a real purchase."
   ],
   [
     "How can I track an order or request a return?",
-    "Visit <a href=\"#/track-order\">Track order</a> for the tracking form, <a href=\"#/policy\">store policies</a> for shipping and return information, or <a href=\"#/contact\">contact support</a>. Live order lookup is not connected in this preview."
+    "Visit <a href=\"/track-order\">Track order</a> for the tracking form, <a href=\"/policy\">store policies</a> for shipping and return information, or <a href=\"/contact\">contact support</a>. Live order lookup is not connected in this preview."
   ]
 ];
 
@@ -756,7 +756,7 @@ function documentPage() {
 
 const views = { home, shop, cart, checkout, quality, blog, article, authenticate, 'track-order': trackOrder, faq, contact, policy, document: documentPage, account };
 
-function currentRoute() { return location.hash.replace('#/', '').split('/')[0] || 'home'; }
+function currentRoute() { return location.pathname.replace(/^\//, '').split('/')[0] || 'home'; }
 function applyTheme() {
   document.documentElement.dataset.theme = state.theme;
   document.documentElement.dataset.coupon = state.couponOpen ? 'open' : 'closed';
@@ -887,7 +887,17 @@ function initFloatingPurchaseBar() {
 }
 
 function render() { document.body.classList.remove('search-open'); document.body.classList.remove('menu-open'); applyTheme(); shell((views[currentRoute()] || home)()); bindEvents(); initHeroCarousel(); initFloatingPurchaseBar(); showSavedReview(); }
-function navigate(route) { location.hash = `/${route}`; }
+function navigate(route) { history.pushState(null, '', route === 'home' ? '/' : `/${route}`); render(); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }
+document.addEventListener('click', event => {
+  const link = event.target.closest('a[href]');
+  if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+  const url = new URL(link.href, location.origin);
+  if (url.origin !== location.origin || url.hash || url.search) return;
+  const route = url.pathname.replace(/^\//, '').replace(/\/$/, '') || 'home';
+  if (!views[route.split('/')[0]]) return;
+  event.preventDefault();
+  navigate(route);
+});
 
 function setMobileMenu(open) {
   const panel = document.querySelector('.mobile-panel');
@@ -912,7 +922,7 @@ document.addEventListener('keydown', event => {
     if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   }
 });
-window.addEventListener('hashchange', () => { if (document.querySelector('.mobile-panel.open')) setMobileMenu(false); });
+window.addEventListener('popstate', () => { if (document.querySelector('.mobile-panel.open')) setMobileMenu(false); });
 
 function bindEvents() {
   const dialog = document.querySelector('#search-dialog');
@@ -1041,7 +1051,7 @@ function handleForm(event) {
   if (form.dataset.form === 'search') return updateSearchResults();
 }
 
-window.addEventListener('hashchange', () => {
+window.addEventListener('popstate', () => {
   render();
   window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 });
