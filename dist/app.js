@@ -80,6 +80,8 @@ heroSlides.forEach((slide, index) => {
   const mobileTimes = ['03_42_35', '03_54_34', '03_42_45', '03_42_48', '03_42_51'];
   slide.desktopImage = './assets/Hero%20section/desktop/' + encodeURIComponent(`ChatGPT Image Sep 9, 2026, ${desktopTimes[index]} AM(1).png`);
   slide.mobileImage = './assets/Hero%20section/mobile%20hero%20page%20images/' + encodeURIComponent(`ChatGPT Image Sep 12, 2026, ${mobileTimes[index]} AM.png`);
+  slide.desktopImage = slide.desktopImage.replace(/\.png$/, '.jpg');
+  slide.mobileImage = slide.mobileImage.replace(/\.png$/, '.jpg');
   assets.hero[index] = slide.desktopImage;
 });
 
@@ -112,7 +114,7 @@ const icon = (name) => ({
 const routeLink = (route, label, className = '') => `<a href="#/${route}" class="${className}" data-route="${route}">${label}</a>`;
 const iconLink = (route, name, label, className = '') => routeLink(route, `${icon(name)}<span class="sr-only">${label}</span>`, `icon-button ${className}`);
 const button = (action, label, className = '', iconName = '') => `<button type="button" class="button ${className}" data-action="${action}">${iconName ? icon(iconName) : ''}<span>${label}</span></button>`;
-const image = (src, alt, className = '') => src ? `<img class="${className}" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy" />` : '<span class="small">Image unavailable</span>';
+const image = (src, alt, className = '') => src ? `<img class="${className}" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="${className === 'product-main-photo' ? 'eager' : 'lazy'}" decoding="async" />` : '<span class="small">Image unavailable</span>';
 const commerce = { client: createShopifyClient(SHOPIFY_CONFIG), products: {}, cart: null, cartReady: false, loading: true, busy: false, error: '', couponMessage: '' };
 const cartStorageKey = 'aura-shopify-cart:' + SHOPIFY_CONFIG.domain;
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -126,7 +128,7 @@ function livePrice(flavour = state.flavour) { return formatMoney(selectedVariant
 function purchaseButton(action, label, className = '', iconName = '', flavour = state.flavour) {
   const available = selectedVariant(flavour)?.availableForSale;
   const disabled = commerce.loading || commerce.busy || !commerce.cartReady || !available;
-  const text = commerce.loading ? 'Loading…' : !available ? (commerce.products[flavour] ? 'Sold out' : 'Unavailable') : label;
+  const text = commerce.loading ? 'Loading…' : commerce.busy ? 'Updating…' : !available ? (commerce.products[flavour] ? 'Sold out' : 'Unavailable') : label;
   return button(action, text, className, iconName).replace('<button ', '<button ' + (disabled ? 'disabled ' : ''));
 }
 function commerceStatus() {
@@ -206,7 +208,7 @@ async function addShopifyProduct(flavour, quantity, buyNow = false) {
   await cartOperation(() => {
     const lines = [{ merchandiseId: variant.id, quantity }];
     return commerce.cart ? commerce.client.add(commerce.cart.id, lines) : commerce.client.create(lines, state.coupon ? [state.coupon] : []);
-  }, () => buyNow ? openShopifyCheckout() : navigate('cart'));
+  }, () => { showToast(`${quantity} × ${flavour} added to your cart`); return buyNow ? openShopifyCheckout() : navigate('cart'); });
 }
 
 async function changeCartLine(action, id) {
@@ -499,7 +501,7 @@ function productZoomControls() {
 }
 
 function shop() {
-  return `<div class="product-page ${productFlavours[state.flavour].theme}">${commerceStatus()}<h1 class="page-title">Aura Whey Protein</h1><div class="product-layout"><section class="product-gallery"><div class="product-main-image">${productZoomControls()}${image(productFlavours[state.flavour].images[state.productImage], `${state.flavour} Aura Whey product`, 'product-main-photo')}</div><div class="thumbnail-row" aria-label="Product images">${productFlavours[state.flavour].images.map((src, index) => `<button type="button" class="thumbnail" data-action="product-image-${index}" aria-label="View ${state.flavour} image ${index + 1}" aria-pressed="${state.productImage === index}">${image(src, `${state.flavour}, image ${index + 1}`)}</button>`).join('')}</div></section><section class="purchase-panel"><p class="breadcrumb">Shop / Whey protein</p><h2>${liveTitle()}</h2><div class="price">${livePrice()}<span>Inclusive of taxes</span></div><p>1 kg · 28 servings · 35 g serving size</p><div class="flavour-picker"><span>Choose flavour</span><div class="button-row"><button type="button" class="flavour ${state.flavour === 'Mawa Kulfi' ? 'active' : ''}" data-action="select-Mawa Kulfi">Mawa Kulfi</button><button type="button" class="flavour ${state.flavour === 'Rich Chocolate' ? 'active' : ''}" data-action="select-Rich Chocolate">Rich Chocolate</button></div></div>${variantPicker()}<p role="status">${selectedVariant()?.availableForSale ? 'In stock' : commerce.loading ? 'Checking availability…' : 'Unavailable'}</p><p>${escapeHtml(commerce.products[state.flavour]?.description || '')}</p><div class="coupon-entry">${couponEntry()}</div><div class="product-actions">${auraQuantity()}<div class="button-row">${purchaseButton('add-cart', 'Add to cart', 'floating-add', 'bag')}${purchaseButton('buy-now', 'Buy now', 'primary')}${routeLink('quality', 'View quality documents', 'button-link secondary')}</div></div>${productInside()}</section></div>${productReviews()}${nutritionTrust()}${floatingPurchaseBar()}</div>`;
+  return `<div class="product-page ${productFlavours[state.flavour].theme}">${commerceStatus()}<h1 class="page-title">Aura Whey Protein</h1><div class="product-layout"><section class="product-gallery"><div class="product-main-image">${image(productFlavours[state.flavour].images[state.productImage], `${state.flavour} Aura Whey product`, 'product-main-photo')}</div>${productZoomControls()}<div class="thumbnail-row" aria-label="Product images">${productFlavours[state.flavour].images.map((src, index) => `<button type="button" class="thumbnail" data-action="product-image-${index}" aria-label="View ${state.flavour} image ${index + 1}" aria-pressed="${state.productImage === index}">${image(src, `${state.flavour}, image ${index + 1}`)}</button>`).join('')}</div></section><section class="purchase-panel"><p class="breadcrumb">Shop / Whey protein</p><h2>${liveTitle()}</h2><div class="price">${livePrice()}<span>Inclusive of taxes</span></div><p>1 kg · 28 servings · 35 g serving size</p><div class="flavour-picker"><span>Choose flavour</span><div class="button-row"><button type="button" class="flavour ${state.flavour === 'Mawa Kulfi' ? 'active' : ''}" data-action="select-Mawa Kulfi">Mawa Kulfi</button><button type="button" class="flavour ${state.flavour === 'Rich Chocolate' ? 'active' : ''}" data-action="select-Rich Chocolate">Rich Chocolate</button></div></div>${variantPicker()}<p role="status">${selectedVariant()?.availableForSale ? 'In stock' : commerce.loading ? 'Checking availability…' : 'Unavailable'}</p><p>${escapeHtml(commerce.products[state.flavour]?.description || '')}</p><div class="coupon-entry">${couponEntry()}</div><div class="product-actions">${auraQuantity()}<div class="button-row">${purchaseButton('add-cart', 'Add to cart', 'floating-add', 'bag')}${purchaseButton('buy-now', 'Buy now', 'primary')}${routeLink('quality', 'View quality documents', 'button-link secondary')}</div></div>${productInside()}</section></div>${productReviews()}${nutritionTrust()}${floatingPurchaseBar()}</div>`;
 }
 
 function auraQuantity() {
@@ -940,6 +942,7 @@ function showToast(message) {
     toast = document.createElement('div');
     toast.id = 'site-toast';
     toast.className = 'site-toast';
+    toast.setAttribute('role', 'status');
     document.body.appendChild(toast);
   }
   toast.textContent = message;

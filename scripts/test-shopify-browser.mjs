@@ -81,6 +81,7 @@ try {
     assert.match(await evaluate("document.querySelector('.purchase-panel h2').textContent"), /Mawa Kulfi/);
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `overflow at ${width}`);
     assert.equal(await evaluate("document.querySelector('[data-action=add-cart]').disabled"), false);
+    assert.equal(await evaluate("document.querySelector('.product-zoom-controls').getBoundingClientRect().top >= document.querySelector('.product-main-image').getBoundingClientRect().bottom"), true, 'zoom controls overlap image');
     await evaluate(`(async () => {
       const img = document.querySelector('.product-main-photo');
       img.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1600"><rect width="900" height="1600" fill="gold"/></svg>');
