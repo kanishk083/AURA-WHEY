@@ -19,8 +19,8 @@ for (const flavour of ['Mawa Kulfi', 'Rich Chocolate']) {
       scrollTop = options.top;
     };
     run(`handleAction('select-${flavour}')`);
-    assert.equal(run('location.hash'), '/shop');
-    events.hashchange();
+    assert.equal(run('location.pathname'), '/shop');
+    events.popstate();
     assert.equal(scrollTop, 0);
     scrollTop = 500;
     run('render()');
@@ -51,7 +51,7 @@ for (const [flavour, theme] of [['Mawa Kulfi', 'flavour-kulfi'], ['Rich Chocolat
     const { run } = storefront();
     await run(`handleAction('add-flavour-${flavour}')`);
     assert.equal(run('state.cart'), 1);
-    assert.equal(run('location.hash'), '/cart');
+    assert.equal(run('location.pathname'), '/cart');
     assert.equal(Number(run('commerce.cart.cost.totalAmount.amount')), flavour === 'Mawa Kulfi' ? 4199 : 4499);
     assert.ok(run('cart()').includes(`Aura Whey ${flavour}`));
     await run("applyShopifyCoupon('DISC5')");
@@ -72,7 +72,7 @@ test('gallery selection updates the image and pressed state without losing the c
   assert.equal(thumbnails.filter(t => t['aria-pressed'] === 'true').length, 1);
   run("handleAction('select-Rich Chocolate')");
   assert.equal(run('state.productImage'), 0);
-  assert.equal(run('location.hash'), '/shop');
+  assert.equal(run('location.pathname'), '/shop');
 });
 
 test('homepage keeps both cards and the existing five-slide hero', () => {

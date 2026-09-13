@@ -7,9 +7,11 @@ import assert from 'node:assert/strict';
 
 const root = resolve('.');
 const live = process.argv.includes('--live');
+const rewrites = JSON.parse(await readFile('vercel.json', 'utf8')).rewrites;
 const server = createServer(async (req, res) => {
   const name = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
-  const file = resolve(root, '.' + (name === '/' ? '/index.html' : name));
+  const rewrite = rewrites.find(rule => new RegExp('^' + rule.source.replace(':slug', '[^/]+') + '$').test(name));
+  const file = resolve(root, '.' + (rewrite?.destination || (name === '/' ? '/index.html' : name)));
   if (!file.startsWith(root + sep)) { res.writeHead(403).end(); return; }
   try {
     let body = await readFile(file);
@@ -74,16 +76,36 @@ try {
   await command('Page.navigate', { url: origin });
   await waitFor('typeof commerce !== "undefined" && !commerce.loading');
   assert.equal(await evaluate('commerce.error'), '');
-  for (const width of [375, 1440]) {
+  await evaluate("document.querySelector('a[data-route=shop]').click()");
+  await waitFor("location.pathname === '/shop' && !!document.querySelector('.purchase-panel')");
+  await evaluate('history.back()');
+  await waitFor("location.pathname === '/' && !!document.querySelector('.hero-carousel')");
+  await evaluate('history.forward()');
+  await waitFor("location.pathname === '/shop' && !!document.querySelector('.purchase-panel')");
+  await command('Page.reload');
+  await waitFor('typeof commerce !== "undefined" && !commerce.loading');
+  assert.equal(await evaluate("location.pathname === '/shop' && !!document.querySelector('.purchase-panel')"), true);
+  for (const width of [320, 375, 390, 430, 768, 1024, 1440]) {
     await command('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 });
-    await evaluate("location.hash = '/shop'");
+    await evaluate("navigate('shop')");
     await waitFor("!!document.querySelector('.purchase-panel')");
     assert.match(await evaluate("document.querySelector('.purchase-panel h2').textContent"), /Mawa Kulfi/);
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `overflow at ${width}`);
     assert.equal(await evaluate("document.querySelector('[data-action=add-cart]').disabled"), false);
+    assert.equal(await evaluate("document.querySelector('.product-zoom-controls').getBoundingClientRect().top >= document.querySelector('.product-main-image').getBoundingClientRect().bottom"), true, 'zoom controls overlap image');
+    await evaluate(`(async () => {
+      const img = document.querySelector('.product-main-photo');
+      img.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1600"><rect width="900" height="1600" fill="gold"/></svg>');
+      await img.decode();
+    })()`);
+    assert.equal(await evaluate(`(() => {
+      const frame = document.querySelector('.product-main-image').getBoundingClientRect();
+      const photo = document.querySelector('.product-main-photo').getBoundingClientRect();
+      return photo.top >= frame.top && photo.bottom <= frame.bottom + 1 && photo.left >= frame.left && photo.right <= frame.right + 1;
+    })()`), true, 'portrait image exceeds gallery at ' + width);
   }
   await evaluate("document.querySelector('[data-action=add-cart]').click()");
-  await waitFor("location.hash === '#/cart' && !!document.querySelector('.cart-item')");
+  await waitFor("location.pathname === '/cart' && !!document.querySelector('.cart-item')");
   await evaluate("document.querySelector('[data-action=line-up]').click()");
   await waitFor('!commerce.busy && commerce.cart.totalQuantity === 2');
   await evaluate("handleAction('select-Rich Chocolate')");
@@ -105,7 +127,7 @@ try {
     await evaluate("document.querySelector('[data-action=checkout]').click()");
     await waitFor("location.hostname !== '127.0.0.1'");
     console.log('Checkout browser navigated to:', await evaluate('location.origin + location.pathname.substring(0, 14)'));
-    await command('Page.navigate', { url: origin + '/#/cart' });
+    await command('Page.navigate', { url: origin + '//cart' });
     await waitFor('typeof commerce !== "undefined" && !commerce.loading && !!commerce.cart');
     await evaluate("document.querySelector('[data-action=line-remove]').click()");
     await waitFor('!commerce.busy && commerce.cart.totalQuantity === 0');

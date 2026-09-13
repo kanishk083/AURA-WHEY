@@ -10,12 +10,13 @@ function storefront() {
   const redirects = [];
   const context = vm.createContext({
     document: { querySelector: () => null, querySelectorAll: () => [], readyState: 'loading', addEventListener() {} },
-    window: { location: { assign: url => redirects.push(url) }, addEventListener(name, handler) { events[name] = handler; } },
+    window: { scrollTo() {}, location: { assign: url => redirects.push(url) }, addEventListener(name, handler) { events[name] = handler; } },
     localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
-    location: { hash: '#/home' }, URL, AbortController, setTimeout, clearTimeout,
+    location: { pathname: '/', origin: 'http://localhost' }, URL, AbortController, setTimeout, clearTimeout,
     console: { warn: (...args) => notices.push(args.join(' ')) },
     fetch: () => { throw new Error('Unstubbed network call'); }
   });
+  context.history = { pushState: (_, unused, path) => { context.location.pathname = path; } };
   vm.runInContext(fs.readFileSync(path.join(root, 'shopify.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(root, 'app.js'), 'utf8'), context);
   const run = code => vm.runInContext(code, context);
