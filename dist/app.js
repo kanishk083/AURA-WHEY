@@ -93,6 +93,7 @@ const state = {
   delivery: { pincode: '', status: 'idle', message: '' },
   document: 'FSSAI licence', auraDownStreak: 0
 };
+const customerAccount = { loading: true, authenticated: false, customer: null, error: '' };
 
 const svg = (paths) => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 const icon = (name) => ({
@@ -279,6 +280,8 @@ function shell(content) {
   const nav = links.map(([route, text]) => routeLink(route, text, `nav-link ${route === current ? 'active' : ''}`)).join('');
   const themeLabel = state.theme === 'dark' ? 'Use light mode' : 'Use dark mode';
   const themeIcon = state.theme === 'dark' ? 'sun' : 'moon';
+  const accountLabel = customerAccount.authenticated ? `Account for ${customerAccount.customer?.displayName || 'customer'}` : 'Sign in or log in';
+  const mobileAccountLabel = customerAccount.authenticated ? 'Your account' : 'Sign in / Log in';
   const root = document.querySelector('#app');
   if (!root) return;
   root.innerHTML = `
@@ -312,7 +315,7 @@ function shell(content) {
             <nav class="desktop-nav" aria-label="Primary navigation">${nav}</nav>
             <div class="header-actions">
               <button type="button" class="icon-button" data-action="open-search" aria-label="Search products" aria-haspopup="dialog">${icon('search')}</button>
-              ${iconLink('account', 'account', 'Sign in or log in')}
+              ${iconLink('account', 'account', accountLabel, customerAccount.authenticated ? 'is-authenticated' : '')}
               ${routeLink('cart', `${icon('bag')}<span class="cart-count" aria-label="${state.cart} items in cart">${state.cart}</span><span class="sr-only">Cart</span>`, 'icon-button cart-link')}
               <button class="icon-button theme-toggle" type="button" data-action="toggle-theme" aria-label="${themeLabel}" title="${themeLabel}">${icon(themeIcon)}</button>
               <button class="icon-button menu-button" type="button" data-action="open-menu" aria-label="Open menu" aria-expanded="false">${icon('menu')}</button>
@@ -324,7 +327,7 @@ function shell(content) {
       <aside class="mobile-panel" id="mobile-menu" aria-label="Mobile navigation" aria-hidden="true" inert>
         <div class="mobile-panel-top">${brand()}<div class="mobile-panel-actions">${routeLink('cart', `${icon('bag')}<span class="cart-count" aria-label="${state.cart} items in cart">${state.cart}</span><span class="sr-only">Cart</span>`, 'icon-button cart-link mobile-cart-link')}<button class="icon-button menu-close" type="button" data-action="close-menu" aria-label="Close menu">${icon('close')}</button></div></div>
         <button type="button" class="mobile-search-trigger" data-action="open-search">${icon('search')} Search products</button>
-        <nav>${nav}${routeLink('account', 'Sign in / Log in')}</nav>
+        <nav>${nav}${routeLink('account', mobileAccountLabel)}</nav>
         <div class="mobile-theme"><span>Appearance</span><button type="button" class="text-button" data-action="toggle-theme">${state.theme === 'dark' ? 'Light mode' : 'Dark mode'}</button></div>
       </aside>
       <main tabindex="-1">${content}${trailingSections}</main>
@@ -736,7 +739,16 @@ function closeSearch() {
 }
 
 
-function account() { return `<section class="page-intro compact"><p class="hero-overline">Your account</p><h1>Sign in to Aura Whey.</h1><div class="account-layout"><form class="form" data-form="account"><label class="field">Email address<input name="email" type="email" placeholder="you@example.com" /></label><label class="field">Password<input name="password" type="password" placeholder="Your password" /></label>${button('submit-account', 'Sign in', 'primary')}</form><div class="account-aside"><h3>New here?</h3><p>Create your customer account during Shopify checkout. You can then return to view your orders.</p>${routeLink('track-order', 'Track an order instead', 'text-link')}</div></div><div id="account-result" aria-live="polite"></div></section>`; }
+function account() {
+  const authFailure = new URLSearchParams(location.search).has('auth');
+  if (customerAccount.loading) return `<section class="page-intro compact account-page"><p class="hero-overline">Your account</p><h1>Checking your account…</h1><p role="status">Loading your secure Shopify account session.</p></section>`;
+  if (customerAccount.authenticated) {
+    const name = escapeHtml(customerAccount.customer?.displayName || 'Aura Whey customer');
+    const email = escapeHtml(customerAccount.customer?.email || '');
+    return `<section class="page-intro compact account-page"><p class="hero-overline">Your account</p><h1>Welcome, ${name}.</h1><div class="account-layout"><div class="account-profile"><span class="account-status">Signed in securely with Shopify</span><h2>${name}</h2>${email ? `<p>${email}</p>` : ''}<p>Your order history and fulfillment updates can be displayed here through the authenticated Customer Account API.</p><a class="button-link secondary" href="/api/auth/logout">Sign out</a></div><div class="account-aside"><h3>Your shopping bag stays with you</h3><p>Signing in or out does not reset the products already saved in this browser.</p>${routeLink('cart', 'View your cart', 'text-link')}</div></div></section>`;
+  }
+  return `<section class="page-intro compact account-page"><p class="hero-overline">Your account</p><h1>Sign in to Aura Whey.</h1>${authFailure || customerAccount.error ? '<div class="result state-invalid" role="alert"><strong>Sign-in was not completed.</strong><p>Please try again. Your cart has not been changed.</p></div>' : ''}<div class="account-layout"><div class="account-sign-in"><p>Continue to Shopify’s secure customer sign-in. Shopify will email you a one-time verification code and return you to Aura Whey.</p><a class="button-link primary" href="/api/auth/login">Continue to secure sign in</a></div><div class="account-aside"><h3>New here?</h3><p>Enter your email on Shopify’s secure page. If you do not have an account yet, Shopify will guide you through the customer account flow.</p>${routeLink('track-order', 'Track an order instead', 'text-link')}</div></div></section>`;
+}
 
 function blog() { return `<section class="page-intro"><p class="hero-overline">Aura journal</p><h1>Train with clarity.</h1><p>Practical reads for choosing your product and making your routine easier to keep.</p></section><section class="section"><div class="featured-post"><div class="featured-image">${image(posts[0].image, posts[0].alt)}</div><div><p class="hero-overline">Featured guide</p><h2>${posts[0].title}</h2><p>${posts[0].excerpt}</p>${routeLink(`article/${posts[0].slug}`, 'Read the guide', 'button-link primary')}</div></div></section><section class="section"><div class="section-inner"><div class="grid grid-3">${[0, 1, 2].map(blogCard).join('')}</div></div></section>`; }
 
@@ -1016,6 +1028,25 @@ function initFloatingPurchaseBar() {
 }
 
 function render() { document.body.classList.remove('search-open'); document.body.classList.remove('menu-open'); applyTheme(); shell((views[currentRoute()] || home)()); bindEvents(); initHeroCarousel(); initFloatingPurchaseBar(); showSavedReview(); }
+
+async function initCustomerAccount() {
+  customerAccount.loading = true;
+  customerAccount.error = '';
+  try {
+    const response = await fetch('/api/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error('Account session request failed.');
+    const result = await response.json();
+    customerAccount.authenticated = Boolean(result.authenticated);
+    customerAccount.customer = result.customer || null;
+  } catch (error) {
+    customerAccount.authenticated = false;
+    customerAccount.customer = null;
+    customerAccount.error = error.message;
+  } finally {
+    customerAccount.loading = false;
+    render();
+  }
+}
 function navigate(route) { history.pushState(null, '', route === 'home' ? '/' : `/${route}`); render(); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }
 document.addEventListener('click', event => {
   const link = event.target.closest('a[href]');
@@ -1213,7 +1244,6 @@ async function handleForm(event) {
     return;
   }
   if (form.dataset.form === 'contact') { document.querySelector('#contact-result').innerHTML = '<div class="result state-valid"><strong>Message received</strong><p>Thanks. The support team will reply to the email address you provided.</p></div>'; return; }
-  if (form.dataset.form === 'account') { document.querySelector('#account-result').innerHTML = '<div class="result"><strong>Account sign-in</strong><p>Connect this form to Shopify customer accounts when the store integration is enabled.</p></div>'; return; }
   if (form.dataset.form === 'search') return updateSearchResults();
 }
 
@@ -1222,8 +1252,9 @@ window.addEventListener('popstate', () => {
   window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 });
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { render(); initCommerce(); });
+  document.addEventListener('DOMContentLoaded', () => { render(); initCommerce(); initCustomerAccount(); });
 } else {
   render();
   initCommerce();
+  initCustomerAccount();
 }

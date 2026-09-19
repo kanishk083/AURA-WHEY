@@ -692,6 +692,11 @@ body.search-open { overflow: hidden; }
 .account-layout, .verify-layout, .track-layout, .contact-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, .72fr); gap: clamp(1.5rem, 5vw, 4rem); align-items: start; }
 .account-aside, .track-help, .contact-aside { display: grid; gap: .7rem; padding: 1.25rem; border: 1px solid var(--line); border-top: 2px solid var(--gold); border-radius: var(--radius-sm); background: var(--surface); }
 .account-aside p, .track-help p, .contact-aside p { margin: 0; font-size: .82rem; }
+.account-sign-in, .account-profile { display: grid; justify-items: start; gap: 1rem; padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.account-sign-in p, .account-profile p { margin: 0; max-width: 42rem; }
+.account-profile h2 { margin: 0; }
+.account-status { color: var(--gold); font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.icon-button.is-authenticated { color: var(--gold); }
 .verify-image img { width: 100%; max-height: 390px; object-fit: contain; }
 .featured-post { width: min(var(--container), calc(100% - 2rem)); display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(18rem, .82fr); gap: clamp(1.5rem, 5vw, 4rem); align-items: center; margin: 0 auto; }
 .featured-image, .blog-image { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-low); }
