@@ -13,9 +13,9 @@ for (const buyNow of [false, true]) {
     const buy = run("purchaseButton('buy-now', 'Buy now')");
     assert.match(add, /disabled/);
     assert.match(buy, /disabled/);
-    assert.ok(add.includes(buyNow ? 'Add to cart' : 'Adding…'));
-    assert.ok(buy.includes(buyNow ? 'Opening checkout…' : 'Buy now'));
-    assert.ok(!run("purchaseButton('add-flavour-Rich Chocolate', 'Add to cart', '', '', 'Rich Chocolate')").includes('Adding…'));
+    assert.ok(add.includes(buyNow ? 'Add to cart' : 'Adding\u2026'));
+    assert.ok(buy.includes(buyNow ? 'Opening checkout\u2026' : 'Buy now'));
+    assert.ok(!run("purchaseButton('add-flavour-Rich Chocolate', 'Add to cart', '', '', 'Rich Chocolate')").includes('Adding\u2026'));
     reject(new Error('Request failed'));
     await request;
     assert.equal(run('commerce.pendingPurchase'), null);

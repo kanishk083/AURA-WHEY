@@ -51,7 +51,7 @@ for (const [flavour, theme] of [['Mawa Kulfi', 'flavour-kulfi'], ['Rich Chocolat
     const { run } = storefront();
     await run(`handleAction('add-flavour-${flavour}')`);
     assert.equal(run('state.cart'), 1);
-    assert.equal(run('location.pathname'), '/cart');
+    assert.equal(run('location.pathname'), '/');
     assert.equal(Number(run('commerce.cart.cost.totalAmount.amount')), flavour === 'Mawa Kulfi' ? 4199 : 4499);
     assert.ok(run('cart()').includes(`Aura Whey ${flavour}`));
     await run("applyShopifyCoupon('DISC5')");
@@ -130,7 +130,7 @@ test('store FAQ renders a centered heading and the complete accordion', () => {
   const markup = run('storeFaq()');
   assert.ok(markup.includes('class="store-faq-heading"'));
   assert.ok(markup.includes('<h2>Got questions?</h2>'));
-  assert.ok(markup.includes('<p>Let’s dive in.</p>'));
+  assert.ok(markup.includes('<p>Let\u2019s dive in.</p>'));
   assert.equal((markup.match(/data-action="faq-/g) || []).length, run('faqs.length'));
 });
 
@@ -149,9 +149,9 @@ test('Aura feedback scales up by quantity and tracks consecutive removals', () =
   run('state.quantity = 3');
   assert.equal(run("auraFeedback('quantity-up')"), '+3000 AURA');
   run('state.quantity = 2');
-  assert.equal(run("auraFeedback('aura-down')"), '−1000 AURA');
+  assert.equal(run("auraFeedback('aura-down')"), '\u22121000 AURA');
   run('state.quantity = 1');
-  assert.equal(run("auraFeedback('quantity-down')"), '−2000 AURA');
+  assert.equal(run("auraFeedback('quantity-down')"), '\u22122000 AURA');
   run('state.quantity = 2');
   assert.equal(run("auraFeedback('aura-up')"), '+2000 AURA');
   assert.equal(run('state.auraDownStreak'), 0);

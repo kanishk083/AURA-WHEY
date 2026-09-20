@@ -8,7 +8,7 @@ test('product page includes delivery options below the purchase controls', () =>
   assert.ok(markup.includes('id="delivery-options-title"'));
   assert.ok(markup.includes('data-form="delivery-check"'));
   assert.ok(markup.includes('name="pincode"'));
-  assert.ok(markup.includes('Free shipping on orders above ₹2,000'));
+  assert.ok(markup.includes('Free shipping on orders above \u20b92,000'));
   assert.ok(markup.includes('Replacement and cancellation policy'));
 });
 
