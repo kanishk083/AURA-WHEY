@@ -829,10 +829,13 @@ body.search-open { overflow: hidden; }
 /* Flat list-row card: no outer border, no rounded container, hairline divider between
    rows, square image on the left, trash icon top-right. */
 .cart-drawer .cart-item { grid-template-columns: 7rem minmax(0, 1fr); gap: 1.1rem; align-items: start; padding: 1.2rem 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+.cart-drawer .cart-item-body { min-width: 0; }
+.cart-drawer .cart-item { grid-template-columns: 9rem minmax(0, 1fr); }
 .cart-drawer .cart-item:first-child { padding-top: 0; }
 .cart-drawer .cart-item:last-child { border-bottom: 0; }
 .cart-drawer .cart-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .6rem; }
 .cart-drawer .cart-item h2 { margin: 0 0 .45rem; color: var(--text); font: 800 .82rem/1.4 Montserrat, Arial, sans-serif; letter-spacing: .025em; text-transform: uppercase; }
+.cart-drawer .cart-item h2, .cart-drawer .cart-item p { overflow-wrap: anywhere; word-break: break-word; }
 .cart-drawer .cart-item-remove { flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--soft); cursor: pointer; transition: background .18s ease, color .18s ease; }
 .cart-drawer .cart-item-remove:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); }
 .cart-drawer .cart-item-remove .icon { width: 1.05rem; height: 1.05rem; }
@@ -868,6 +871,7 @@ body.search-open { overflow: hidden; }
 .summary > p .button { width: 100%; }
 .applied-coupon { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .8rem; padding: .7rem; border: 1px dashed var(--gold); border-radius: 6px; }
 .applied-coupon-code, .pincode-value { font-weight: 700; }
+.coupon-party { font-size: 1rem; line-height: 1; }
 .applied-coupon-state { font-size: .75rem; color: var(--muted); }
 .applied-coupon-remove, .pincode-change { min-height: 44px; padding: .4rem; border: 0; background: transparent; color: var(--gold); text-decoration: underline; font-weight: 700; }
 .applied-coupon-remove { margin-left: auto; }
@@ -887,7 +891,17 @@ body.search-open { overflow: hidden; }
 .summary-tax-note { margin: .2rem 0 0; color: var(--soft); font-size: .74rem; }
 .summary-savings-banner { margin: .8rem 0 0; padding: .6rem .8rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--text); font-size: .82rem; text-align: center; }
 .summary-payments { padding-top: 1rem; text-align: center; }
-.summary-payments-badge { display: inline-grid; place-items: center; min-width: 3rem; height: 1.5rem; margin: 0 .2rem; padding: 0 .4rem; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-low); color: var(--soft); font: 700 .58rem/1 Montserrat, Arial, sans-serif; letter-spacing: .04em; }
+.payment-logos { display: flex; align-items: center; justify-content: center; gap: .45rem; flex-wrap: wrap; }
+.payment-logo { display: inline-grid; place-items: center; min-width: 2.7rem; height: 1.45rem; padding: 0 .28rem; border: 1px solid color-mix(in srgb, var(--line) 75%, transparent); border-radius: 3px; background: #fff; font: 800 .48rem/1 Montserrat, Arial, sans-serif; letter-spacing: -.02em; }
+.payment-visa { color: #1261a0; font-size: .7rem; font-style: italic; }
+.payment-mastercard { position: relative; display: flex; min-width: 2.5rem; border: 0; background: transparent; }
+.payment-mastercard i { width: 1rem; height: 1rem; border-radius: 50%; background: #eb001b; }
+.payment-mastercard i + i { margin-left: -.35rem; background: #f79e1b; opacity: .95; }
+.payment-rupay { color: #172c85; font-style: italic; }
+.payment-bhim { color: #157447; }
+.payment-card, .payment-netbanking { color: #4f8295; font-size: .38rem; }
+.summary-payments-note { display: flex; align-items: center; justify-content: center; gap: .45rem; }
+.secure-shield { display: inline-grid; place-items: center; width: 1.15rem; height: 1.15rem; border-radius: 50% 50% 45% 45%; background: #35a854; color: #fff; font: 800 .7rem/1 Arial, sans-serif; }
 .summary-payments-note { margin: .7rem 0 0; color: var(--soft); font-size: .75rem; }
 .cart-layout .cart-item { gap: 1.25rem; padding: 1.25rem; }
 .cart-layout .cart-image { width: 9rem; height: 9rem; }
