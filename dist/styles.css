@@ -677,6 +677,9 @@ button.thumbnail:hover { border-color: var(--gold); }
 .quality-hero-copy h1 { margin: .75rem 0 1.25rem; font-size: clamp(2rem, 3.3vw, 3.5rem); }
 .quality-hero-copy > p:last-child { color: #514a3e; max-width: 48ch; margin: 0; }
 @media (max-width: 900px) {
+  .quality-hero { color: #fff; }
+  .quality-hero-copy h1 { color: #fff; }
+  .quality-hero-copy > p:last-child { color: rgba(255, 255, 255, .86); }
   .quality-hero-inner { grid-area: 1 / 1; padding-block: 2.5rem; }
   .quality-hero-copy { width: 100%; max-width: 600px; }
   .quality-hero-image { grid-area: 2 / 1; }
