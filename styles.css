@@ -889,6 +889,22 @@ body.search-open { overflow: hidden; }
 .summary-payments { padding-top: 1rem; text-align: center; }
 .summary-payments-badge { display: inline-grid; place-items: center; min-width: 3rem; height: 1.5rem; margin: 0 .2rem; padding: 0 .4rem; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-low); color: var(--soft); font: 700 .58rem/1 Montserrat, Arial, sans-serif; letter-spacing: .04em; }
 .summary-payments-note { margin: .7rem 0 0; color: var(--soft); font-size: .75rem; }
+.cart-layout .cart-item { gap: 1.25rem; padding: 1.25rem; }
+.cart-layout .cart-image { width: 9rem; height: 9rem; }
+.cart-layout .summary-card { margin-bottom: .9rem; padding-block: 1.2rem; border-bottom: 1px solid color-mix(in srgb, var(--gold) 35%, transparent); }
+.cart-layout .summary-card-title { color: var(--gold); font-size: .7rem; letter-spacing: .04em; text-transform: none; }
+.cart-layout .summary-card-note, .cart-layout .summary-tax-note, .cart-layout .summary-payments-note { color: var(--muted); }
+.cart-layout .summary-row-total { border-top-color: color-mix(in srgb, var(--gold) 55%, transparent); }
+.cart-layout .summary-row-total strong:last-child { color: var(--gold); font-size: 1.35rem; }
+.cart-layout .summary > p .button.primary { box-shadow: 0 5px 20px rgba(245, 180, 0, .14); transition: box-shadow .2s ease, transform .2s ease; }
+.cart-layout .summary > p .button.primary:hover, .cart-layout .summary > p .button.primary:focus-visible { box-shadow: 0 8px 28px rgba(245, 180, 0, .38); transform: translateY(-2px); }
+.cart-layout .summary > p.small { color: var(--muted); }
+@media (max-width: 640px) {
+  .cart-drawer-body { padding-inline: 1rem; }
+  .cart-drawer .summary-card { padding-inline: 1rem; }
+  .cart-layout .summary-card { padding-block: 1.35rem; }
+  .cart-layout .cart-item { padding-block: 1.1rem; }
+}
 .cart-drawer .empty-state { padding: 1.5rem 0; }
 body.cart-open { overflow: hidden; }
 @media (max-width: 480px) {
