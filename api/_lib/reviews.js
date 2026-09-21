@@ -55,7 +55,8 @@ async function antiSpam(ip, input) {
 
 async function db(path, options = {}) {
   const { url, key } = supabaseConfig();
-  const response = await fetch(`${url}/rest/v1/${path}`, { ...options, headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(options.headers || {}) }, signal: AbortSignal.timeout(10000) });
+  const authorization = /^eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(key) ? { Authorization: `Bearer ${key}` } : {};
+  const response = await fetch(`${url}/rest/v1/${path}`, { ...options, headers: { apikey: key, ...authorization, 'Content-Type': 'application/json', ...(options.headers || {}) }, signal: AbortSignal.timeout(10000) });
   if (!response.ok) fail(502, 'Reviews are temporarily unavailable.');
   return response.status === 204 ? null : response.json();
 }

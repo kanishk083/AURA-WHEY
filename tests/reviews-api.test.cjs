@@ -1,7 +1,7 @@
 const { test, mock } = require('node:test');
 const assert = require('node:assert/strict');
 const mod = import('../api/_lib/reviews.js');
-process.env.SUPABASE_URL = 'https://fixture.supabase.co'; process.env.SUPABASE_SERVICE_ROLE_KEY = 'fixture-service-role-key';
+process.env.SUPABASE_URL = 'https://fixture.supabase.co'; process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_fixture-service-role-key';
 
 function response() { return { statusCode: 0, body: null, headers: {}, setHeader(k, v) { this.headers[k] = v; }, status(n) { this.statusCode = n; return this; }, json(v) { this.body = v; return this; } }; }
 function request(body, ip = '203.0.113.5') { return { body, headers: { 'x-forwarded-for': ip } }; }
@@ -45,8 +45,40 @@ test('GET filters by exact product handle or returns a mixed home feed', async t
   await listReviews({ url: 'https://example.test/api/reviews?scope=home' }); assert.match(calls[1], /in\.\(/);
 });
 
+test('modern Supabase secret keys use apikey without a bearer authorization header', async t => {
+  const { listReviews } = await mod;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_modern-fixture-key';
+  let headers; t.mock.method(global, 'fetch', async (_url, options) => { headers = options.headers; return { ok: true, status: 200, json: async () => [] }; });
+  await listReviews({ url: 'https://example.test/api/reviews?scope=home' });
+  assert.equal(headers.apikey, 'sb_secret_modern-fixture-key');
+  assert.equal(headers.Authorization, undefined);
+});
+
+test('legacy JWT Supabase service-role keys use apikey and bearer authorization', async t => {
+  const { listReviews } = await mod;
+  const key = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.fixture-signature';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = key;
+  let headers; t.mock.method(global, 'fetch', async (_url, options) => { headers = options.headers; return { ok: true, status: 200, json: async () => [] }; });
+  await listReviews({ url: 'https://example.test/api/reviews?scope=home' });
+  assert.equal(headers.apikey, key);
+  assert.equal(headers.Authorization, `Bearer ${key}`);
+});
+
 test('Supabase failure is returned as a safe generic error', async t => {
   const { createReview } = await mod;
+  const key = 'sb_secret_must-never-be-exposed';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = key;
   t.mock.method(global, 'fetch', async () => ({ ok: false, status: 500, json: async () => ({ secret: 'db detail' }) }));
-  await assert.rejects(createReview(request({ productHandle: 'aura-whey-rich-chocolate-1-kg', displayName: 'Rahul', rating: 5, reviewText: 'A real review with enough words.' })), { status: 502 });
+  const error = await createReview(request({ productHandle: 'aura-whey-rich-chocolate-1-kg', displayName: 'Rahul', rating: 5, reviewText: 'A real review with enough words.' })).catch(value => value);
+  assert.equal(error.status, 502); assert.equal(error.message, 'Reviews are temporarily unavailable.'); assert.equal(JSON.stringify(error).includes(key), false);
+});
+
+test('review API responses and logs never expose Supabase secret values', async t => {
+  const { default: handler } = await import('../api/reviews/index.js');
+  const key = 'sb_secret_response-log-fixture'; process.env.SUPABASE_SERVICE_ROLE_KEY = key;
+  const logged = []; t.mock.method(console, 'log', (...values) => logged.push(values)); t.mock.method(console, 'error', (...values) => logged.push(values));
+  t.mock.method(global, 'fetch', async () => ({ ok: false, status: 401, json: async () => ({ message: key }) }));
+  const res = response(); await handler({ method: 'GET', url: 'https://example.test/api/reviews?scope=home' }, res);
+  assert.equal(res.statusCode, 502); assert.equal(res.body.message, 'Reviews are temporarily unavailable.');
+  assert.equal(JSON.stringify(res.body).includes(key), false); assert.equal(JSON.stringify(logged).includes(key), false);
 });
