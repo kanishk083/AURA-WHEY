@@ -484,7 +484,7 @@ function home() {
   return `
     ${heroBannerCarousel()}
     <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Pick your flavour</h2><div class="gold-rule"></div></div><p>Choose the flavour that fits the ritual you want to repeat.</p></div><div class="grid product-grid">${productCard('Mawa Kulfi')}${productCard('Rich Chocolate')}</div></div></section>
-    ${reviewShowcase('home')}
+    ${reviewShowcase('home', reviewData.home || approvedReviews)}
     <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Made for the routine</h2><div class="gold-rule"></div></div><p>Simple product details. Familiar flavours. A dependable post-training choice.</p></div><div class="image-section">${routeLink('shop', image(assets.why, 'Aura Whey athlete campaign with Mawa Kulfi and Rich Chocolate'), 'routine-banner-link')}</div><p class="button-row">${routeLink('shop', 'Shop now', 'button-link primary')}${routeLink('article/plan-your-protein-routine', 'Build your routine', 'button-link secondary')}</p></div></section>
     <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Know your pack</h2><div class="gold-rule"></div></div><p>Read the nutrition panel, check the documents, then find your batch report.</p></div><div class="grid grid-2"><div class="card label-card">${image(assets.labelMawa, 'Aura Whey Mawa Kulfi nutrition label', 'label-preview')}</div><div class="quality-cta"><h3>Quality documents and batch reports</h3><p>Our quality library keeps the supplied certification documents in one place. Check whether a third-party laboratory report is available for your batch.</p><div class="button-row">${routeLink('quality', 'Open quality library', 'button-link primary')}${routeLink('verify', 'Verify a batch', 'button-link')}</div></div></div></div></section>
     <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Better-informed training</h2><div class="gold-rule"></div></div><p>Practical guides for choosing, using, and enjoying your whey protein.</p></div><div class="grid grid-3">${blogCard(0)}${blogCard(1)}${blogCard(2)}</div><p>${routeLink('blog', 'Browse the journal', 'button-link secondary')}</p></div></section>
@@ -592,17 +592,18 @@ function shopInvitation() {
 }
 
 const approvedReviews = Object.freeze([]);
+let reviewData = { home: null, product: null };
 
 function reviewCard(review) {
   const rating = Math.max(1, Math.min(5, Number(review.rating) || 1));
-  const name = String(review.name || 'Aura Whey customer').trim();
+  const name = String(review.displayName || review.name || 'Aura Whey customer').trim();
   const initials = name.split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join('').toUpperCase() || 'AW';
   const badge = review.verified ? 'Verified purchase' : 'Customer review';
-  return `<article class="review-card"><div class="review-card-top"><span class="review-avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(review.flavour || state.flavour)}</span></div></div><div class="review-stars" aria-label="${rating} out of 5 stars">${'\u2605'.repeat(rating)}<span aria-hidden="true">${'\u2606'.repeat(5 - rating)}</span></div><p class="review-copy">\u201c${escapeHtml(review.text || '')}\u201d</p><span class="review-badge">${escapeHtml(badge)}</span></article>`;
+  return `<article class="review-card"><div class="review-card-top"><span class="review-avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(review.productName || review.flavour || state.flavour)}</span></div></div><div class="review-stars" aria-label="${rating} out of 5 stars">${'\u2605'.repeat(rating)}<span aria-hidden="true">${'\u2606'.repeat(5 - rating)}</span></div><p class="review-copy">\u201c${escapeHtml(review.reviewText || review.text || '')}\u201d</p><span class="review-badge">${escapeHtml(badge)}</span></article>`;
 }
 
 function approvedReviewCards(reviews = approvedReviews, scope = 'product') {
-  const visible = reviews.filter(review => review?.approved === true && (scope === 'home' || !review.flavour || review.flavour === state.flavour));
+  const visible = reviews.filter(review => review && review.approved !== false && (scope === 'home' || review.shopifyProductHandle === SHOPIFY_CONFIG.products[state.flavour]));
   if (!visible.length) {
     const subject = scope === 'home' ? 'Mawa Kulfi and Rich Chocolate' : state.flavour;
     return `<div class="review-empty"><span aria-hidden="true">\u2606</span><div><h3>Community stories are warming up.</h3><p>Approved customer reviews for ${escapeHtml(subject)} will appear here.</p></div></div>`;
@@ -628,14 +629,15 @@ function productReviews() {
   const labels = ['Poor', 'Fair', 'Good', 'Great', 'Superb'];
   const star = `<svg viewBox="0 0 24 24" width="36" height="36" focusable="false"><path fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round" d="M12 3 14.8 8.7 21 9.6 16.5 14 17.6 20.2 12 17.3 6.4 20.2 7.5 14 3 9.6 9.2 8.7Z"/></svg>`;
   const rating = `<fieldset class="review-rating peek-rating"><legend>Your rating</legend><div class="peek-rating-stars" role="radiogroup" aria-label="Your rating"><span class="peek-rating-tip" aria-live="polite">Good</span>${[1, 2, 3, 4, 5].map(n => `<label data-rating="${n}"><input class="peek-rating-input" type="radio" name="rating" value="${n}"${n === 3 ? ' checked' : ''} required /><span aria-hidden="true">${star}</span><span class="sr-only">${n} \u2014 ${labels[n - 1]}</span></label>`).join('')}</div></fieldset>`;
-  return `${reviewShowcase('product')}<section class="section review-contribute-section"><div class="section-inner"><div class="review-contribute"><div class="review-layout"><div><p class="hero-overline">Your turn</p><h3>Share your Aura.</h3><p>How did it taste? How did it mix? Tell us what made it part of your routine.</p><p class="small">For now, this creates a private preview in your browser. It will not be published until Shopify review moderation is connected.</p></div><form class="form" data-form="review"><label class="field">Your name<input name="reviewName" maxlength="60" required autocomplete="given-name" /></label>${rating}<label class="field">Your review<textarea name="reviewText" rows="4" minlength="10" maxlength="1000" required placeholder="Tell us about the flavour and your experience"></textarea></label><button type="submit" class="button primary">Preview my review</button><div id="review-result" role="status" aria-live="polite"></div></form></div></div></div></section>`;
+  return `${reviewShowcase('product', reviewData.product || approvedReviews)}<section class="section review-contribute-section"><div class="section-inner"><div class="review-contribute"><div class="review-layout"><div><p class="hero-overline">Your turn</p><h3>Share your Aura.</h3><p>How did it taste? How did it mix? Tell us what made it part of your routine.</p><p class="small">Your review is published immediately after a quick safety check.</p></div><form class="form" data-form="review"><label class="field">Your name<input name="reviewName" maxlength="60" required autocomplete="given-name" /></label><label class="field" aria-hidden="true" style="position:absolute;left:-9999px">Website<input name="website" tabindex="-1" autocomplete="off" /></label>${rating}<label class="field">Your review<textarea name="reviewText" rows="4" minlength="10" maxlength="1000" required placeholder="Tell us about the flavour and your experience"></textarea></label><button type="submit" class="button primary">Submit review</button><div id="review-result" role="status" aria-live="polite"></div></form></div></div></div></section>`;
 }
 
 function showSavedReview() {
+  return undefined;
   const preview = document.querySelector('#review-preview');
   if (!preview) return;
   try {
-    const review = JSON.parse(localStorage.getItem('aura-review-' + state.flavour) || 'null');
+    const review = null;
     if (!review || typeof review.name !== 'string' || typeof review.text !== 'string' || !Number.isInteger(review.rating) || review.rating < 1 || review.rating > 5) return;
     preview.replaceChildren();
     const stars = document.createElement('div');
@@ -656,6 +658,27 @@ function showSavedReview() {
     preview.append(stars, body, footer);
     preview.hidden = false;
   } catch { preview.hidden = true; }
+}
+
+async function loadReviews(scope = 'product') {
+  const url = scope === 'home' ? '/api/reviews?scope=home' : '/api/reviews?product=' + encodeURIComponent(SHOPIFY_CONFIG.products[state.flavour]);
+  const section = document.querySelector(`[data-review-scope="${scope}"]`);
+  if (section) section.querySelector('.review-board').innerHTML = '<p class="review-loading" role="status">Loading reviews...</p>';
+  try {
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Reviews are temporarily unavailable.');
+    reviewData[scope] = result.reviews || [];
+  } catch (error) {
+    if (section) section.querySelector('.review-board').innerHTML = `<p class="review-error" role="alert">${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  if (section) section.querySelector('.review-board').innerHTML = approvedReviewCards(reviewData[scope], scope);
+}
+
+function loadReviewsForPage() {
+  if (currentRoute() === 'shop') loadReviews('product');
+  if (currentRoute() === 'home') loadReviews('home');
 }
 
 function storeFaq() {
@@ -1237,6 +1260,7 @@ function render() {
   initHeroCarousel();
   initFloatingPurchaseBar();
   showSavedReview();
+  loadReviewsForPage();
   if (drawerOpen) setCartDrawer(true, false);
   if (window.scrollX !== scrollX || window.scrollY !== scrollY) window.scrollTo({ top: scrollY, left: scrollX, behavior: 'instant' });
   if (!focusKey) return;
@@ -1525,12 +1549,16 @@ async function handleForm(event) {
     const rating = Number(form.elements.rating.value);
     const result = document.querySelector('#review-result');
     if (!name || text.length < 10 || text.length > 1000 || name.length > 60 || !Number.isInteger(rating) || rating < 1 || rating > 5) { result.textContent = 'Add your name, a rating and at least 10 characters about your experience.'; return; }
+    const submit = form.querySelector('button[type="submit"]'); submit.disabled = true; result.textContent = 'Publishing your review...';
     try {
-      localStorage.setItem('aura-review-' + state.flavour, JSON.stringify({ name, text, rating }));
-      showSavedReview();
-      result.textContent = 'Your review preview is saved in this browser. It has not been published.';
-      form.reset();
-    } catch { result.textContent = 'Browser storage is unavailable. Your review has not been saved; please keep a copy of your text.'; }
+      const response = await fetch('/api/reviews', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ productHandle: SHOPIFY_CONFIG.products[state.flavour], displayName: name, rating, reviewText: text, website: form.elements.website.value }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Unable to publish your review.');
+      result.textContent = 'Thanks — your review is now live.';
+      form.reset(); reviewData.product = [payload.review, ...(reviewData.product || [])];
+      const board = document.querySelector('[data-review-scope="product"] .review-board'); if (board) board.innerHTML = approvedReviewCards(reviewData.product, 'product');
+    } catch (error) { result.textContent = error.message; }
+    finally { submit.disabled = false; }
     return;
   }
   if (form.dataset.form === 'coupon') return applyShopifyCoupon(form.elements.coupon.value.trim().toUpperCase());
