@@ -238,7 +238,7 @@ main { width: 100%; padding-top: calc(var(--banner-h) + var(--header-h)); overfl
 }
 @media (prefers-reduced-motion: reduce) {
   .coupon-ticker-content { animation: none; }
-  body .hero-slide { transition: none; }
+  .hero-slide { transition: none; }
 }
 .small { color: var(--soft); font-size: .75rem; }
 

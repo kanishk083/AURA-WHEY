@@ -79,7 +79,7 @@
     trigger = opener;
     const source = opener.querySelector('img');
     zoom = 1; x = y = 0;
-    photo.src = source.currentSrc || source.src;
+    photo.src = source.src;
     photo.alt = source.alt;
     dialog.showModal();
     document.body.classList.add('product-viewer-open');

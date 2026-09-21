@@ -168,8 +168,7 @@ function acceptCart(cart) {
   }
 }
 
-async function initCommerce(force = false) {
-  if (!force && !['home', 'shop', 'cart', 'checkout'].includes(currentRoute())) return;
+async function initCommerce() {
   if (commerce.busy) return;
   commerce.busy = true;
   commerce.loading = true;
@@ -1191,9 +1190,6 @@ function initFloatingPurchaseBar() {
 
 function refreshCommerceView() {
   if (!document.createElement || !document.querySelector('main')) return render();
-  const active = document.activeElement;
-  const focusAction = active?.dataset?.action;
-  const focusLine = active?.dataset?.lineId;
   const route = currentRoute();
   const template = document.createElement('template');
   if (['home', 'shop', 'cart', 'checkout'].includes(route)) template.innerHTML = (views[route] || home)();
@@ -1214,10 +1210,6 @@ function refreshCommerceView() {
   });
   bindEvents();
   if (route === 'shop') initFloatingPurchaseBar();
-  if (focusAction && !active.isConnected) {
-    const replacement = [...document.querySelectorAll('[data-action]')].find(node => node.dataset.action === focusAction && node.dataset.lineId === focusLine);
-    replacement?.focus({ preventScroll: true });
-  }
 }
 
 function render() {
@@ -1267,7 +1259,7 @@ async function initCustomerAccount() {
     });
   }
 }
-function navigate(route) { history.pushState(null, '', route === 'home' ? '/' : `/${route}`); if (cartDrawerState.open) setCartDrawer(false, false); render(); if (commerce.loading && !commerce.busy) initCommerce(); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }
+function navigate(route) { history.pushState(null, '', route === 'home' ? '/' : `/${route}`); if (cartDrawerState.open) setCartDrawer(false, false); render(); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }
 document.addEventListener('click', event => {
   const link = event.target.closest('a[href]');
   if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
@@ -1458,7 +1450,7 @@ async function handleAction(action, element) {
   }
   if (action === 'open-menu') return setMobileMenu(true);
   if (action === 'close-menu') return setMobileMenu(false);
-  if (action === 'open-cart') { if (commerce.loading && !commerce.busy) initCommerce(true); return setCartDrawer(true); }
+  if (action === 'open-cart') return setCartDrawer(true);
   if (action === 'close-cart') return setCartDrawer(false);
   if (action === 'go-shop') return navigate('shop');
   if (action.startsWith('select-')) { state.flavour = action.replace('select-', ''); state.productImage = 0; state.imageZoom = 1; return currentRoute() === 'shop' ? render() : navigate('shop'); }
@@ -1552,7 +1544,6 @@ async function handleForm(event) {
 
 window.addEventListener('popstate', () => {
   render();
-  if (commerce.loading && !commerce.busy) initCommerce();
   window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 });
 if (document.readyState === 'loading') {

@@ -1,4 +1,8 @@
 {
+  "headers": [
+    { "source": "/assets/:path*", "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" }] },
+    { "source": "/static/:path*", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] }
+  ],
   "rewrites": [
     { "source": "/home", "destination": "/index.html" },
     { "source": "/shop", "destination": "/index.html" },

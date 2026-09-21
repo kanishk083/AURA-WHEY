@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { stat, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import path from 'node:path';
 
@@ -41,6 +41,11 @@ createServer(async (request, response) => {
   }
 
   const requestedFile = path.resolve(root, `.${pathname}`);
+  if (pathname === '/api/auth/session') {
+    response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return response.end(JSON.stringify({ authenticated: false }));
+  }
+  if (pathname.startsWith('/api/')) return sendError(response, 404);
   if (requestedFile !== root && !requestedFile.startsWith(`${root}${path.sep}`)) return sendError(response, 404);
 
   try {
@@ -48,6 +53,13 @@ createServer(async (request, response) => {
     if (info.isFile()) return sendFile(response, requestedFile, request.method);
   } catch { /* Extensionless paths may be client-side routes. */ }
 
-  if (!path.extname(pathname)) return sendFile(response, path.join(root, 'index.html'), request.method);
+  if (!path.extname(pathname)) {
+    if (new URL(request.url, 'http://localhost').searchParams.get('perf') === '1') {
+      const html = await readFile(path.join(root, 'index.html'), 'utf8');
+      response.writeHead(200, { 'Content-Type': mimeTypes['.html'], 'Cache-Control': 'no-store' });
+      return response.end(html.replace('<head>', '<head><script src="/scripts/performance-probe.js"></script>'));
+    }
+    return sendFile(response, path.join(root, 'index.html'), request.method);
+  }
   return sendError(response, 404);
 }).listen(port, () => console.log(`Aura Whey preview running at http://localhost:${port}`));

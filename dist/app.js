@@ -122,7 +122,12 @@ const icon = (name) => ({
 const routeLink = (route, label, className = '') => `<a href="/${route}" class="${className}" data-route="${route}">${label}</a>`;
 const iconLink = (route, name, label, className = '') => routeLink(route, `${icon(name)}<span class="sr-only">${label}</span>`, `icon-button ${className}`);
 const button = (action, label, className = '', iconName = '') => `<button type="button" class="button ${className}" data-action="${action}">${iconName ? icon(iconName) : ''}<span>${label}</span></button>`;
-const image = (src, alt, className = '') => src ? `<img class="${className}" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="${className === 'product-main-photo' ? 'eager' : 'lazy'}" decoding="async" />` : '<span class="small">Image unavailable</span>';
+const image = (src, alt, className = '') => {
+  if (!src) return '<span class="small">Image unavailable</span>';
+  const gallery = /optimized\/site\/(MK|RC)%20Card\/.*\.webp$/.test(src);
+  const responsive = gallery ? ` srcset="${escapeHtml(src.replace('.webp', '-160.jpg'))} 160w, ${escapeHtml(src.replace('.webp', '-640.jpg'))} 640w, ${escapeHtml(src)} 1254w" sizes="${className === 'product-thumbnail' ? '88px' : '(max-width: 768px) 90vw, 600px'}" width="1254" height="1254"` : '';
+  return `<img class="${className}" src="${escapeHtml(src)}"${responsive} alt="${escapeHtml(alt)}" loading="${className === 'product-main-photo' ? 'eager' : 'lazy'}" ${className === 'product-main-photo' ? 'fetchpriority="high"' : ''} decoding="async" />`;
+};
 const commerce = { client: createShopifyClient(SHOPIFY_CONFIG), products: {}, cart: null, cartReady: false, loading: true, busy: false, pendingPurchase: null, error: '', couponMessage: '' };
 const cartStorageKey = 'aura-shopify-cart:' + SHOPIFY_CONFIG.domain;
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -163,14 +168,21 @@ function acceptCart(cart) {
   }
 }
 
-async function initCommerce() {
+async function initCommerce(force = false) {
+  if (!force && !['home', 'shop', 'cart', 'checkout'].includes(currentRoute())) return;
   if (commerce.busy) return;
   commerce.busy = true;
   commerce.loading = true;
   commerce.error = '';
-  render();
+  // Initial markup already shows loading; keep its images and animations mounted.
   try {
-    const products = await commerce.client.products();
+    let id;
+    try { id = localStorage.getItem(cartStorageKey); } catch { id = null; }
+    id = id || commerce.cart?.id;
+    const [products, savedCart] = await Promise.all([
+      commerce.client.products(),
+      id ? commerce.client.cart(id) : Promise.resolve(null)
+    ]);
     for (const [flavour, product] of Object.entries(products)) {
       const previous = commerce.products[flavour]?.selectedVariantId;
       product.selectedVariantId = product.variants.nodes.find(variant => variant.id === previous)?.id || product.variants.nodes.find(variant => variant.availableForSale)?.id || product.variants.nodes[0]?.id;
@@ -178,10 +190,7 @@ async function initCommerce() {
     }
     commerce.products = products;
     state.productImage = 0;
-    let id;
-    try { id = localStorage.getItem(cartStorageKey); } catch { id = null; }
-    id = id || commerce.cart?.id;
-    if (id) acceptCart(await commerce.client.cart(id));
+    if (id) acceptCart(savedCart);
     commerce.cartReady = true;
   } catch (error) {
     commerce.error = error.message;
@@ -189,7 +198,7 @@ async function initCommerce() {
   } finally {
     commerce.loading = false;
     commerce.busy = false;
-    render();
+    refreshCommerceView();
   }
 }
 
@@ -205,7 +214,7 @@ async function cartOperation(operation, after, pendingPurchase = null) {
     commerce.busy = false;
     // Patch the visible line items in place instead of rebuilding the shell, so the cart
     // page and drawer do not flash on every quantity change.
-    if (!patchCartLines()) render();
+    refreshCommerceView();
     if (after && !result.warnings.length) await after();
   } catch (error) {
     commerce.error = error.message;
@@ -252,20 +261,25 @@ function cartSummaryCard() {
   return `<h2>Order summary</h2>${cartSummaryMarkup()}<p><button class="button primary" type="button" data-action="checkout" ${commerce.busy ? 'disabled' : ''}>Secure checkout</button></p><p class="small">Final shipping and taxes are confirmed at checkout.</p>`;
 }
 
-// Returns false when the visible cart cannot be patched (wrong view, empty cart, or the
-// line count changed), letting the caller fall back to a full render.
+// Returns false when the visible cart cannot be patched (wrong view or missing hosts),
+// letting the caller fall back to a full render.
 function patchCartLines() {
   // The product page's own quantity controls read from the cart line, not .cart-layout,
   // so patch them too or the number never moves while a cart line exists.
   patchProductQuantityControls();
   const hosts = [...document.querySelectorAll('.cart-layout > section')];
   const lines = commerce.cart?.lines.nodes || [];
-  if (!hosts.length || !lines.length) return false;
-  const existing = [...document.querySelectorAll('.cart-item[data-line-id]')];
-  if (lines.length !== existing.length) return false;
+  // An emptied cart switches to the empty state, which cannot be patched line by line.
+  if (!lines.length) {
+    if (hosts.length) render();
+    return true;
+  }
+  if (!hosts.length) return false;
   const html = lines.map(cartLineMarkup).join('');
   const summaries = [...document.querySelectorAll('.summary')];
   if (hosts.length !== summaries.length) return false;
+  // Replacing the innerHTML of the existing hosts keeps the page shell, scroll position
+  // and focus intact, so adding or removing a line no longer flashes the whole cart.
   hosts.forEach(host => { host.innerHTML = html; });
   summaries.forEach(summary => summary.innerHTML = cartSummaryCard());
   if (cartDrawerState.open) setCartDrawer(true, false);
@@ -274,7 +288,7 @@ function patchCartLines() {
 
 function patchProductQuantityControls() {
   const line = productCartLine();
-  if (!line) return;
+  if (!line?.quantity) return;
   document.querySelectorAll('.product-actions .aura-quantity.pack-row, .floating-qty-group').forEach(control => {
     const output = control.querySelector('output');
     if (output) output.textContent = String(line.quantity);
@@ -298,7 +312,7 @@ async function addShopifyProduct(flavour, quantity, buyNow = false) {
   await cartOperation(() => {
     const lines = [{ merchandiseId: variant.id, quantity }];
     return commerce.cart ? commerce.client.add(commerce.cart.id, lines) : commerce.client.create(lines, state.coupon ? [state.coupon] : []);
-  }, () => { if (buyNow) return openShopifyCheckout(); showToast('Product added to bag'); render(); }, { action: buyNow ? 'buy' : 'add', flavour });
+  }, () => { if (buyNow) return openShopifyCheckout(); showToast('Product added to bag'); }, { action: buyNow ? 'buy' : 'add', flavour });
 }
 
 async function changeCartLine(action, id) {
@@ -443,8 +457,8 @@ function heroBannerCarousel() {
               <div class="hero-slide ${isActive ? 'is-active' : ''}" data-slide-index="${index}" role="group" aria-roledescription="slide" aria-label="${slide.title}" aria-hidden="${!isActive}">
                 <a href="${slide.link || '/shop'}" class="hero-slide-link" tabindex="${isActive ? '0' : '-1'}">
                   <picture class="hero-picture">
-                    ${slide.mobileImage ? `<source media="(max-width: 768px)" srcset="${slide.mobileImage}">` : ''}
-                    <img class="hero-banner-img" src="${slide.desktopImage}" alt="${slide.alt || slide.title}" width="1920" height="730" decoding="async" fetchpriority="${isActive ? 'high' : 'low'}" loading="${isActive ? 'eager' : 'lazy'}" />
+                    ${slide.mobileImage ? `<source media="(max-width: 768px)" ${isActive ? 'srcset' : 'data-srcset'}="${slide.mobileImage}">` : ''}
+                    <img class="hero-banner-img" ${isActive ? 'src' : 'data-src'}="${slide.desktopImage}" alt="${slide.alt || slide.title}" width="1920" height="730" decoding="async" fetchpriority="${isActive ? 'high' : 'low'}" loading="${isActive ? 'eager' : 'lazy'}" />
                   </picture>
                 </a>
               </div>`;
@@ -673,7 +687,7 @@ function packControls(line) {
 function productActions() {
   const line = productCartLine();
   if (line) return `${packControls(line)}<div class="button-row">${button('open-cart', 'Go to cart', 'primary go-to-cart')}</div>`;
-  return `${auraQuantity()}<div class="button-row">${purchaseButton('add-cart', 'Add to cart', 'floating-add', 'bag')}${purchaseButton('buy-now', 'Buy now', 'primary')}${routeLink('quality', 'View quality documents', 'button-link secondary')}</div>`;
+  return `<div class="button-row">${purchaseButton('add-cart', 'Add to cart', 'floating-add', 'bag')}${purchaseButton('buy-now', 'Buy now', 'primary')}${routeLink('quality', 'View quality documents', 'button-link secondary')}</div>`;
 }
 
 function floatingActions() {
@@ -710,7 +724,7 @@ function openRemoveModal(line) {
 }
 
 function shop() {
-  return `<div class="product-page ${productFlavours[state.flavour].theme}">${commerceStatus()}<h1 class="page-title">Aura Whey Protein</h1><div class="product-layout"><section class="product-gallery"><button type="button" class="product-main-image" data-image-viewer aria-label="Open ${state.flavour} image viewer">${image(productFlavours[state.flavour].images[state.productImage], `${state.flavour} Aura Whey product`, 'product-main-photo')}<span class="product-image-hint" aria-hidden="true">${icon('search')}</span></button><div class="thumbnail-row" aria-label="Product images">${productFlavours[state.flavour].images.map((src, index) => `<button type="button" class="thumbnail" data-action="product-image-${index}" aria-label="View ${state.flavour} image ${index + 1}" aria-pressed="${state.productImage === index}">${image(src, `${state.flavour}, image ${index + 1}`)}</button>`).join('')}</div></section><section class="purchase-panel"><p class="breadcrumb">Shop / Whey protein</p><h2>${liveTitle()}</h2><div class="price">${livePrice()}<span>Inclusive of taxes</span></div><p>1 kg · 28 servings · 35 g serving size</p><div class="flavour-picker"><span>Choose flavour</span><div class="button-row"><button type="button" class="flavour ${state.flavour === 'Mawa Kulfi' ? 'active' : ''}" data-action="select-Mawa Kulfi">Mawa Kulfi</button><button type="button" class="flavour ${state.flavour === 'Rich Chocolate' ? 'active' : ''}" data-action="select-Rich Chocolate">Rich Chocolate</button></div></div>${variantPicker()}<p role="status">${selectedVariant()?.availableForSale ? 'In stock' : commerce.loading ? 'Checking availability\u2026' : 'Unavailable'}</p><p>${escapeHtml(commerce.products[state.flavour]?.description || '')}</p><div class="coupon-entry">${couponEntry()}</div><div class="product-actions">${productActions()}</div>${deliveryOptions()}${productInside()}</section></div>${productReviews()}${nutritionTrust()}${shopInvitation()}${storeFaq()}${floatingPurchaseBar()}</div>`;
+return `<div class="product-page ${productFlavours[state.flavour].theme}"><div class="commerce-status">${commerceStatus()}</div><h1 class="page-title">Aura Whey Protein</h1><div class="product-layout"><section class="product-gallery"><button type="button" class="product-main-image" data-image-viewer aria-label="Open ${state.flavour} image viewer">${image(productFlavours[state.flavour].images[state.productImage], `${state.flavour} Aura Whey product`, 'product-main-photo')}<span class="product-image-hint" aria-hidden="true">${icon('search')}</span></button><div class="thumbnail-row" aria-label="Product images">${productFlavours[state.flavour].images.map((src, index) => `<button type="button" class="thumbnail" data-action="product-image-${index}" aria-label="View ${state.flavour} image ${index + 1}" aria-pressed="${state.productImage === index}">${image(src, `${state.flavour}, image ${index + 1}`, 'product-thumbnail')}</button>`).join('')}</div></section><section class="purchase-panel"><p class="breadcrumb">Shop / Whey protein</p><h2>${liveTitle()}</h2><div class="price">${livePrice()}<span>Inclusive of taxes</span></div><p>1 kg · 28 servings · 35 g serving size</p><div class="flavour-picker"><span>Choose flavour</span><div class="button-row"><button type="button" class="flavour ${state.flavour === 'Mawa Kulfi' ? 'active' : ''}" data-action="select-Mawa Kulfi">Mawa Kulfi</button><button type="button" class="flavour ${state.flavour === 'Rich Chocolate' ? 'active' : ''}" data-action="select-Rich Chocolate">Rich Chocolate</button></div></div>${variantPicker()}<p role="status">${selectedVariant()?.availableForSale ? 'In stock' : commerce.loading ? 'Checking availability\u2026' : 'Unavailable'}</p><p>${escapeHtml(commerce.products[state.flavour]?.description || '')}</p><div class="coupon-entry">${couponEntry()}</div><div class="product-actions">${productActions()}</div>${deliveryOptions()}${productInside()}</section></div>${productReviews()}${nutritionTrust()}${shopInvitation()}${storeFaq()}${floatingPurchaseBar()}</div>`;
 }
 
 function auraQuantity() {
@@ -1005,12 +1019,31 @@ let purchaseBarFallbackCleanup = null;
 let purchaseBarState = { visible: false };
 let cartDrawerState = { open: false };
 
-function setHeroSlide(index) {
+let heroRequest = 0;
+let heroObserver;
+let heroVisible = true;
+let heroHovered = false;
+function prepareHeroImage(img) {
+  if (!img) return;
+  const source = img.parentElement.querySelector('source[data-srcset]');
+  if (source) { source.srcset = source.dataset.srcset; source.removeAttribute('data-srcset'); }
+  if (img.dataset.src) { img.src = img.dataset.src; img.removeAttribute('data-src'); }
+  img.loading = 'eager';
+}
+async function setHeroSlide(index) {
   const count = heroSlides.length;
-  state.heroSlide = ((index % count) + count) % count;
+  const next = ((index % count) + count) % count;
+  const request = ++heroRequest;
 
   const carousel = document.querySelector('#hero-carousel');
   if (!carousel) return;
+  const incoming = carousel.querySelector(`[data-slide-index="${next}"] img`);
+  if (incoming) {
+    prepareHeroImage(incoming);
+    try { await incoming.decode(); } catch { return; }
+  }
+  if (request !== heroRequest || !carousel.isConnected) return;
+  state.heroSlide = next;
 
   const slides = document.querySelectorAll('#hero-carousel .hero-slide');
   slides.forEach((el, i) => {
@@ -1034,11 +1067,13 @@ function setHeroSlide(index) {
   }
 
   resetHeroTimer();
+  const upcoming = carousel.querySelector(`[data-slide-index="${(next + 1) % count}"] img`);
+  prepareHeroImage(upcoming);
 }
 
 function startHeroTimer() {
   stopHeroTimer();
-  if (currentRoute() !== 'home') return;
+  if (currentRoute() !== 'home' || document.hidden || !heroVisible || heroHovered || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
   heroTimer = setInterval(() => {
     setHeroSlide(state.heroSlide + 1);
   }, 5000);
@@ -1056,14 +1091,30 @@ function resetHeroTimer() {
 }
 
 function initHeroCarousel() {
+  heroObserver?.disconnect();
+  heroRequest++;
+  heroHovered = false;
   const carousel = document.querySelector('#hero-carousel');
   if (!carousel) {
     stopHeroTimer();
     return;
   }
 
-  carousel.onmouseenter = stopHeroTimer;
-  carousel.onmouseleave = startHeroTimer;
+  carousel.onmouseenter = () => { heroHovered = true; stopHeroTimer(); };
+  carousel.onmouseleave = () => { heroHovered = false; startHeroTimer(); };
+  if (window.IntersectionObserver) {
+    heroObserver = new window.IntersectionObserver(([entry]) => {
+      heroVisible = entry.isIntersecting;
+      if (heroVisible) startHeroTimer(); else stopHeroTimer();
+    });
+    heroObserver.observe(carousel);
+  }
+  const first = carousel.querySelector('.is-active img');
+  first?.decode().then(() => {
+    if (!carousel.isConnected) return;
+    const next = carousel.querySelector(`[data-slide-index="${(state.heroSlide + 1) % heroSlides.length}"] img`);
+    prepareHeroImage(next);
+  }).catch(() => {});
 
   let startX = 0;
   let startY = 0;
@@ -1086,6 +1137,10 @@ function initHeroCarousel() {
 
   startHeroTimer();
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopHeroTimer(); else startHeroTimer();
+});
 
 function initFloatingPurchaseBar() {
   purchaseBarObserver?.disconnect();
@@ -1134,6 +1189,37 @@ function initFloatingPurchaseBar() {
   purchaseBarObserver.observe(purchaseGallery);
 }
 
+function refreshCommerceView() {
+  if (!document.createElement || !document.querySelector('main')) return render();
+  const active = document.activeElement;
+  const focusAction = active?.dataset?.action;
+  const focusLine = active?.dataset?.lineId;
+  const route = currentRoute();
+  const template = document.createElement('template');
+  if (['home', 'shop', 'cart', 'checkout'].includes(route)) template.innerHTML = (views[route] || home)();
+  const status = document.querySelector('main .commerce-status');
+  if (status) status.innerHTML = commerceStatus();
+  // Replace commerce UI only, retaining the gallery, hero, reviews and scroll position.
+  for (const selector of route === 'home' ? ['.product-card-body'] : route === 'shop' ? ['.purchase-panel', '.floating-purchase-actions', '.floating-product-summary'] : []) {
+    const existing = document.querySelectorAll('main ' + selector);
+    template.content.querySelectorAll(selector).forEach((next, index) => existing[index]?.replaceWith(next));
+  }
+  if (route === 'cart' || route === 'checkout') document.querySelector('main').innerHTML = template.innerHTML;
+  const drawer = document.querySelector('.cart-drawer-body');
+  if (drawer) drawer.innerHTML = cart();
+  document.querySelectorAll('.cart-count').forEach(node => {
+    node.textContent = state.cart;
+    node.setAttribute('aria-label', `${state.cart} items in cart`);
+    node.closest('button')?.setAttribute('aria-label', `${state.cart} items in cart, open cart`);
+  });
+  bindEvents();
+  if (route === 'shop') initFloatingPurchaseBar();
+  if (focusAction && !active.isConnected) {
+    const replacement = [...document.querySelectorAll('[data-action]')].find(node => node.dataset.action === focusAction && node.dataset.lineId === focusLine);
+    replacement?.focus({ preventScroll: true });
+  }
+}
+
 function render() {
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
@@ -1175,10 +1261,13 @@ async function initCustomerAccount() {
     customerAccount.error = error.message;
   } finally {
     customerAccount.loading = false;
-    render();
+    if (currentRoute() === 'account') render();
+    else document.querySelectorAll('a[data-route="account"]').forEach(link => {
+      link.setAttribute('aria-label', customerAccount.authenticated ? 'Your account' : 'Sign in or log in');
+    });
   }
 }
-function navigate(route) { history.pushState(null, '', route === 'home' ? '/' : `/${route}`); if (cartDrawerState.open) setCartDrawer(false, false); render(); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }
+function navigate(route) { history.pushState(null, '', route === 'home' ? '/' : `/${route}`); if (cartDrawerState.open) setCartDrawer(false, false); render(); if (commerce.loading && !commerce.busy) initCommerce(); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }
 document.addEventListener('click', event => {
   const link = event.target.closest('a[href]');
   if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
@@ -1240,25 +1329,29 @@ document.addEventListener('keydown', event => {
 window.addEventListener('popstate', () => { if (document.querySelector('.mobile-panel.open')) setMobileMenu(false); if (document.querySelector('.cart-drawer.open')) setCartDrawer(false); });
 
 function bindEvents() {
+  // Rebinding after partial updates must not accumulate event listeners.
+  document.querySelectorAll('form[data-form]').forEach(form => { form.onsubmit = handleForm; });
   const dialog = document.querySelector('#search-dialog');
-  dialog.addEventListener('close', () => document.body.classList.remove('search-open'));
-  dialog.addEventListener('click', event => { if (event.target === dialog) closeSearch(); });
-  document.querySelector('#search-overlay-input').addEventListener('input', updateSearchResults);
-  document.querySelector('#search-products').addEventListener('click', event => {
+  dialog.onclose = () => document.body.classList.remove('search-open');
+  dialog.onclick = event => { if (event.target === dialog) closeSearch(); };
+  document.querySelector('#search-overlay-input').oninput = updateSearchResults;
+  document.querySelector('#search-products').onclick = event => {
     const card = event.target.closest('[data-action]');
     if (card) { closeSearch(); handleAction(card.dataset.action, card); }
-  });
-  document.querySelectorAll('[data-route]').forEach(link => link.addEventListener('click', () => setTimeout(() => document.querySelector('main')?.focus(), 0)));
-  document.querySelector('[data-variant-select]')?.addEventListener('change', event => {
+  };
+  document.querySelectorAll('[data-route]').forEach(link => { link.onclick = () => setTimeout(() => document.querySelector('main')?.focus(), 0); });
+  const variantSelect = document.querySelector('[data-variant-select]');
+  if (variantSelect) variantSelect.onchange = event => {
     commerce.products[state.flavour].selectedVariantId = event.target.value;
     const variant = selectedVariant();
     const index = productFlavours[state.flavour].images.indexOf(variant.image?.url);
     state.productImage = Math.max(0, index);
     state.quantity = 1;
     render();
-  });
-  document.querySelectorAll('form[data-form]').forEach(form => form.addEventListener('submit', handleForm));
+  };
   document.querySelectorAll('.peek-rating-stars').forEach(group => {
+    if (group.dataset.bound) return;
+    group.dataset.bound = 'true';
     let selected = Number(group.querySelector('input:checked')?.value || 0);
     updatePeekRating(group, selected);
     group.querySelectorAll('input').forEach(input => {
@@ -1335,7 +1428,8 @@ async function handleAction(action, element) {
   if (action.startsWith('line-')) return changeCartLine(action, element.dataset.lineId);
   if (action === 'box-up' || action === 'box-down') {
     const line = productCartLine();
-    if (!line) return;
+    // A decrement on a product that is not in the cart would do nothing visible.
+    if (!line?.quantity) return;
     const newQuantity = line.quantity + (action === 'box-up' ? 1 : -1);
     if (newQuantity < 1) return;
     await setCartLineQuantity(line, action === 'box-up' ? 1 : -1);
@@ -1364,7 +1458,7 @@ async function handleAction(action, element) {
   }
   if (action === 'open-menu') return setMobileMenu(true);
   if (action === 'close-menu') return setMobileMenu(false);
-  if (action === 'open-cart') return setCartDrawer(true);
+  if (action === 'open-cart') { if (commerce.loading && !commerce.busy) initCommerce(true); return setCartDrawer(true); }
   if (action === 'close-cart') return setCartDrawer(false);
   if (action === 'go-shop') return navigate('shop');
   if (action.startsWith('select-')) { state.flavour = action.replace('select-', ''); state.productImage = 0; state.imageZoom = 1; return currentRoute() === 'shop' ? render() : navigate('shop'); }
@@ -1373,6 +1467,7 @@ async function handleAction(action, element) {
     state.imageZoom = 1;
     const galleryImage = document.querySelector('.product-main-image img');
     galleryImage.src = productFlavours[state.flavour].images[state.productImage];
+    galleryImage.srcset = [160, 640].map(size => `${galleryImage.src.replace('.webp', `-${size}.jpg`)} ${size}w`).concat(`${galleryImage.src} 1254w`).join(', ');
     galleryImage.alt = `Aura Whey ${state.flavour}, image ${state.productImage + 1}`;
     galleryImage.style = galleryImage.style || {};
     galleryImage.style.transform = 'scale(1)';
@@ -1457,6 +1552,7 @@ async function handleForm(event) {
 
 window.addEventListener('popstate', () => {
   render();
+  if (commerce.loading && !commerce.busy) initCommerce();
   window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 });
 if (document.readyState === 'loading') {

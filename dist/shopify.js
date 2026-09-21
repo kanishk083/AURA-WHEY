@@ -17,7 +17,7 @@ function createShopifyClient(config, request = fetch) {
     cost { subtotalAmount { ${money} } totalAmount { ${money} } totalTaxAmount { ${money} } }
     lines(first: 100) { nodes { id quantity cost { totalAmount { ${money} } }
       merchandise { ... on ProductVariant { id title availableForSale price { ${money} }
-        image { url altText } product { handle title } } }
+        image { url(transform: {maxWidth: 240}) altText } product { handle title } } }
     } pageInfo { hasNextPage } }`;
 
   async function query(query, variables = {}) {
@@ -45,7 +45,7 @@ function createShopifyClient(config, request = fetch) {
     const entries = await Promise.all(Object.entries(config.products).map(async ([flavour, handle]) => {
       const data = await query(`query Product($handle: String!, $country: CountryCode!) @inContext(country: $country) {
         product(handle: $handle) { id handle title description availableForSale
-          featuredImage { url altText } images(first: 50) { nodes { url altText } }
+          featuredImage { url altText }
           variants(first: 100) { nodes { id title availableForSale selectedOptions { name value }
             price { ${money} } image { url altText }
           } pageInfo { hasNextPage } }
