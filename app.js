@@ -903,7 +903,15 @@ function batchReportResult(value) {
   return `<div class="batch-result-card batch-result-found"><div class="batch-result-heading"><div>${icon('file')}</div><div><p>Report available</p><h2>Batch ${escapeHtml(report.batchNumber)}</h2></div></div><p class="batch-report-note">A third-party laboratory report is available for this batch. This result does not authenticate an individual tub.</p><dl class="batch-details">${details.map(([label, detail]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(detail)}</dd></div>`).join('')}</dl><a class="button-link primary" href="${escapeHtml(report.reportUrl)}" target="_blank" rel="noopener">View Original Lab Report</a></div>`;
 }
 
-function trackOrder() { return `<section class="page-intro compact"><p class="hero-overline">Order tracking</p><h1>Where is your order?</h1><div class="track-layout"><div><form class="form" data-form="tracking"><label class="field">Order number<input name="order" placeholder="e.g. AW-1001" /></label><label class="field">Email address<input name="email" type="email" placeholder="Email used at checkout" /></label>${button('find-order', 'Find order', 'primary')}</form><div id="tracking-result" aria-live="polite"></div></div><div class="track-help"><h3>Need help?</h3><p>Your order number is included in the email confirmation sent after checkout.</p>${routeLink('contact', 'Contact support', 'text-link')}</div></div></section>`; }
+function trackOrder() { return `<section class="page-intro compact"><p class="hero-overline">Order tracking</p><h1>Where is your order?</h1><div class="track-layout"><div><form class="form" data-form="tracking"><label class="field">Order number<input name="orderNumber" maxlength="24" placeholder="e.g. #1001" required /></label><label class="field">Email address<input name="email" type="email" maxlength="254" placeholder="Email used at checkout" required /></label>${button('find-order', 'Find order', 'primary')}</form><div id="tracking-result" aria-live="polite"></div></div><div class="track-help"><h3>Need help?</h3><p>Your order number is included in the email confirmation sent after checkout.</p>${routeLink('contact', 'Contact support', 'text-link')}</div></div></section>`; }
+
+function trackingResult(order) {
+  const stages = [['confirmed', 'Confirmed'], ['processing', 'Processing'], ['shipped', 'Shipped'], ['out_for_delivery', 'Out for delivery'], ['delivered', 'Delivered']];
+  const rank = stages.findIndex(([key]) => key === order.progress);
+  const progress = stages.map(([key, label], index) => `<li class="tracking-step ${index <= rank ? 'is-complete' : ''} ${key === order.progress ? 'is-current' : ''}"><span>${index < rank ? '✓' : index + 1}</span><small>${label}</small></li>`).join('');
+  const tracking = order.tracking.map(item => `<div class="tracking-entry"><strong>${escapeHtml(item.company || 'Carrier')}</strong>${item.number ? `<span>${escapeHtml(item.number)}</span>` : ''}${item.url ? `<a class="button-link secondary" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">Track shipment</a>` : ''}</div>`).join('');
+  return `<article class="tracking-order-card"><div class="tracking-order-heading"><div><p class="hero-overline">Order found</p><h2>${escapeHtml(order.orderNumber)}</h2><p>${escapeHtml(new Date(order.orderDate).toLocaleDateString('en-IN', { dateStyle: 'medium' }))}</p></div><span class="tracking-status">${escapeHtml(order.fulfillmentStatus || 'Processing')}</span></div><ol class="tracking-progress" aria-label="Order progress">${progress}</ol>${order.preparing ? '<div class="result state-valid"><strong>Preparing your order</strong><p>Your order has not received fulfillment or tracking information yet.</p></div>' : ''}<div class="tracking-order-grid"><div><h3>Products</h3><ul>${order.products.map(item => `<li>${escapeHtml(item.title)} <strong>×${Number(item.quantity) || 0}</strong></li>`).join('')}</ul></div><div><h3>Payment & total</h3><p>${escapeHtml(order.paymentStatus || 'Unavailable')}</p><strong>${escapeHtml(order.currency || '')} ${escapeHtml(order.total || '—')}</strong></div></div>${tracking ? `<div class="tracking-carrier"><h3>Shipment tracking</h3>${tracking}</div>` : ''}<button type="button" class="button secondary" disabled aria-describedby="tracking-cancel-note">Cancel order</button><p id="tracking-cancel-note" class="small">Cancellation will be available shortly.</p></article>`;
+}
 
 const faqs = [
   [
@@ -1568,10 +1576,18 @@ async function handleForm(event) {
     return;
   }
   if (form.dataset.form === 'tracking') {
-    const order = form.elements.order.value.trim().toUpperCase();
-    const email = form.elements.email.value.trim();
-    const found = order === 'AW-1001' && email;
-    document.querySelector('#tracking-result').innerHTML = found ? '<div class="result state-valid"><strong>Order found</strong><p>Your order is confirmed. Courier details and delivery updates will appear here after Shopify tracking is connected.</p></div>' : '<div class="result state-invalid"><strong>No matching order</strong><p>Check the order number and email address, then try again.</p></div>';
+    const result = document.querySelector('#tracking-result');
+    const submit = form.querySelector('button[type="submit"]');
+    if (!form.reportValidity()) return;
+    submit.disabled = true; result.innerHTML = '<p class="small" role="status">Finding your order…</p>';
+    try {
+      const response = await fetch('/api/track-order', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ orderNumber: form.elements.orderNumber.value.trim(), email: form.elements.email.value.trim() }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'Order tracking is temporarily unavailable.');
+      result.innerHTML = trackingResult(payload.order);
+    } catch (error) {
+      result.innerHTML = `<div class="result state-invalid" role="alert"><strong>${error.message.includes('not found') ? 'No matching order' : 'Unable to find your order'}</strong><p>${escapeHtml(error.message)}</p></div>`;
+    } finally { submit.disabled = false; }
     return;
   }
   if (form.dataset.form === 'contact') { document.querySelector('#contact-result').innerHTML = '<div class="result state-valid"><strong>Message received</strong><p>Thanks. The support team will reply to the email address you provided.</p></div>'; return; }
