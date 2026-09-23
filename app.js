@@ -381,23 +381,19 @@ function shell(content) {
     <div class="shell ${shellTheme} ${current === 'shop' ? 'product-route' : ''}">
       <header class="site-header">
         <div class="coupon-wrap" role="region" aria-label="Special Offers">
-          <div class="coupon-ticker-track" data-action="apply-coupon" title="Click to copy & apply code DISC5 (5% OFF)">
+          <div class="coupon-ticker-track" data-action="apply-coupon" title="Click to copy & apply code DISC5 (10% OFF)">
             <div class="coupon-ticker-content">
-              <span class="ticker-item"><span class="ticker-pill">OFFER</span> Use Coupon Code <strong class="ticker-code">"DISC5"</strong> to get 5% off on all orders</span>
+              <span class="ticker-item"><span class="ticker-pill">OFFER</span> Use Coupon Code <strong class="ticker-code">"DISC5"</strong> to get 10% off on all orders</span>
               <span class="ticker-dot">\u2022</span>
               <span class="ticker-item">\u{1F69A} FREE EXPRESS DELIVERY ACROSS INDIA OVER \u20b9999</span>
               <span class="ticker-dot">\u2022</span>
               <span class="ticker-item">\u26A1 100% GENUINE & NABL LAB TESTED</span>
               <span class="ticker-dot">\u2022</span>
-              <span class="ticker-item">CASH ON DELIVERY (COD) AVAILABLE</span>
-              <span class="ticker-dot">\u2022</span>
-              <span class="ticker-item"><span class="ticker-pill">OFFER</span> Use Coupon Code <strong class="ticker-code">"DISC5"</strong> to get 5% off on all orders</span>
+              <span class="ticker-item"><span class="ticker-pill">OFFER</span> Use Coupon Code <strong class="ticker-code">"DISC5"</strong> to get 10% off on all orders</span>
               <span class="ticker-dot">\u2022</span>
               <span class="ticker-item">\u{1F69A} FREE EXPRESS DELIVERY ACROSS INDIA OVER \u20b9999</span>
               <span class="ticker-dot">\u2022</span>
               <span class="ticker-item">\u26A1 100% GENUINE & NABL LAB TESTED</span>
-              <span class="ticker-dot">\u2022</span>
-              <span class="ticker-item">CASH ON DELIVERY (COD) AVAILABLE</span>
               <span class="ticker-dot">\u2022</span>
             </div>
           </div>
