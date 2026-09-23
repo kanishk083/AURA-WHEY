@@ -910,7 +910,66 @@ function trackingResult(order) {
   const rank = stages.findIndex(([key]) => key === order.progress);
   const progress = stages.map(([key, label], index) => `<li class="tracking-step ${index <= rank ? 'is-complete' : ''} ${key === order.progress ? 'is-current' : ''}"><span>${index < rank ? '✓' : index + 1}</span><small>${label}</small></li>`).join('');
   const tracking = order.tracking.map(item => `<div class="tracking-entry"><strong>${escapeHtml(item.company || 'Carrier')}</strong>${item.number ? `<span>${escapeHtml(item.number)}</span>` : ''}${item.url ? `<a class="button-link secondary" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">Track shipment</a>` : ''}</div>`).join('');
-  return `<article class="tracking-order-card"><div class="tracking-order-heading"><div><p class="hero-overline">Order found</p><h2>${escapeHtml(order.orderNumber)}</h2><p>${escapeHtml(new Date(order.orderDate).toLocaleDateString('en-IN', { dateStyle: 'medium' }))}</p></div><span class="tracking-status">${escapeHtml(order.fulfillmentStatus || 'Processing')}</span></div><ol class="tracking-progress" aria-label="Order progress">${progress}</ol>${order.preparing ? '<div class="result state-valid"><strong>Preparing your order</strong><p>Your order has not received fulfillment or tracking information yet.</p></div>' : ''}<div class="tracking-order-grid"><div><h3>Products</h3><ul>${order.products.map(item => `<li>${escapeHtml(item.title)} <strong>×${Number(item.quantity) || 0}</strong></li>`).join('')}</ul></div><div><h3>Payment & total</h3><p>${escapeHtml(order.paymentStatus || 'Unavailable')}</p><strong>${escapeHtml(order.currency || '')} ${escapeHtml(order.total || '—')}</strong></div></div>${tracking ? `<div class="tracking-carrier"><h3>Shipment tracking</h3>${tracking}</div>` : ''}<button type="button" class="button secondary" disabled aria-describedby="tracking-cancel-note">Cancel order</button><p id="tracking-cancel-note" class="small">Cancellation will be available shortly.</p></article>`;
+  const cancellation = order.cancellation || { eligible: false, message: 'Cancellation unavailable' };
+  const cancelled = order.cancelled ? `<div class="result state-valid tracking-cancelled" role="status"><strong>ORDER CANCELLED</strong><p>Your cancellation has been confirmed. Any eligible refund is being returned to your original payment method.</p>${order.refundStatus ? `<p>Refund/payment status: ${escapeHtml(order.refundStatus)}</p>` : ''}</div>` : '';
+  const cancellationAction = order.cancelled ? '' : cancellation.eligible
+    ? '<button type="button" class="button secondary" data-track-cancel>Cancel order</button><p id="tracking-cancel-note" class="small">Cancellation available for this order.</p>'
+    : `<button type="button" class="button secondary" disabled aria-describedby="tracking-cancel-note">Cancel order</button><p id="tracking-cancel-note" class="small">${escapeHtml(cancellation.message || 'Cancellation unavailable')}</p>`;
+  return `<article class="tracking-order-card"><div class="tracking-order-heading"><div><p class="hero-overline">Order found</p><h2>${escapeHtml(order.orderNumber)}</h2><p>${escapeHtml(new Date(order.orderDate).toLocaleDateString('en-IN', { dateStyle: 'medium' }))}</p></div><span class="tracking-status">${escapeHtml(order.fulfillmentStatus || 'Processing')}</span></div>${cancelled}<ol class="tracking-progress" aria-label="Order progress">${progress}</ol>${order.preparing && !order.cancelled ? '<div class="result state-valid"><strong>Preparing your order</strong><p>Your order has not received fulfillment or tracking information yet.</p></div>' : ''}<div class="tracking-order-grid"><div><h3>Products</h3><ul>${order.products.map(item => `<li>${escapeHtml(item.title)} <strong>×${Number(item.quantity) || 0}</strong></li>`).join('')}</ul></div><div><h3>Payment & total</h3><p>${escapeHtml(order.paymentStatus || 'Unavailable')}</p><strong>${escapeHtml(order.currency || '')} ${escapeHtml(order.total || '—')}</strong>${order.refundStatus ? `<p class="small">${escapeHtml(order.refundStatus)}</p>` : ''}</div></div>${tracking ? `<div class="tracking-carrier"><h3>Shipment tracking</h3>${tracking}</div>` : ''}<div class="tracking-cancellation">${cancellationAction}</div></article>`;
+}
+
+function bindTrackedOrderCancellation(order, lookupForm, result) {
+  const trigger = result.querySelector('[data-track-cancel]');
+  if (!trigger || !order.cancellation?.eligible) return;
+  trigger.addEventListener('click', () => openTrackCancellationDialog(order, lookupForm, result, trigger), { once: true });
+}
+
+function openTrackCancellationDialog(order, lookupForm, result, trigger) {
+  const reasons = [['changed_mind', 'Changed my mind'], ['ordered_by_mistake', 'Ordered by mistake'], ['incorrect_product', 'Incorrect product'], ['other', 'Other']];
+  const dialog = document.createElement('dialog');
+  dialog.className = 'track-cancel-dialog';
+  dialog.setAttribute('aria-labelledby', 'track-cancel-title');
+  dialog.innerHTML = `<form><h2 id="track-cancel-title">Cancel order ${escapeHtml(order.orderNumber)}?</h2><p>Your order will be cancelled and the eligible payment will be refunded to the original payment method.</p><label class="field">Reason<select name="reason" required><option value="">Choose a reason</option>${reasons.map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></label><div role="status" data-cancel-status></div><div class="button-row"><button class="button secondary" type="button" data-keep-order>Keep order</button><button class="button primary" type="submit">Cancel order</button></div></form>`;
+  document.body.append(dialog);
+  const form = dialog.querySelector('form');
+  const status = dialog.querySelector('[data-cancel-status]');
+  const cancelButton = form.querySelector('button[type="submit"]');
+  let busy = false;
+  dialog.querySelector('[data-keep-order]').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); });
+  dialog.addEventListener('close', () => { dialog.remove(); trigger.focus(); });
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (busy || !form.reportValidity()) return;
+    busy = true;
+    form.querySelectorAll('button, select').forEach(control => { control.disabled = true; });
+    cancelButton.textContent = 'Cancelling order...';
+    status.textContent = 'Confirming the latest order status with Shopify...';
+    try {
+      const response = await fetch('/api/track-order/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ orderNumber: lookupForm.elements.orderNumber.value.trim(), email: lookupForm.elements.email.value.trim(), reason: form.elements.reason.value }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'This order cannot be cancelled online. Please contact AURA WHEY support.');
+      if (!payload.cancelled || !payload.order) {
+        status.textContent = payload.message || 'Cancellation is processing. Check the order again shortly.';
+        const keep = dialog.querySelector('[data-keep-order]');
+        keep.disabled = false;
+        keep.textContent = 'Close and check order';
+        return;
+      }
+      result.innerHTML = trackingResult(payload.order);
+      bindTrackedOrderCancellation(payload.order, lookupForm, result);
+      dialog.close();
+    } catch (error) {
+      status.textContent = error.message;
+      form.querySelectorAll('button, select').forEach(control => { control.disabled = false; });
+      cancelButton.textContent = 'Cancel order';
+    } finally { busy = false; }
+  });
+  dialog.showModal();
 }
 
 const faqs = [
@@ -1585,6 +1644,7 @@ async function handleForm(event) {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Order tracking is temporarily unavailable.');
       result.innerHTML = trackingResult(payload.order);
+      bindTrackedOrderCancellation(payload.order, form, result);
     } catch (error) {
       result.innerHTML = `<div class="result state-invalid" role="alert"><strong>${error.message.includes('not found') ? 'No matching order' : 'Unable to find your order'}</strong><p>${escapeHtml(error.message)}</p></div>`;
     } finally { submit.disabled = false; }

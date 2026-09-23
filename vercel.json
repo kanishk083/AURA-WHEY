@@ -4,6 +4,7 @@
     { "source": "/static/:path*", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] }
   ],
   "rewrites": [
+    { "source": "/api/track-order/cancel", "destination": "/api/track-order-cancel" },
     { "source": "/home", "destination": "/index.html" },
     { "source": "/shop", "destination": "/index.html" },
     { "source": "/cart", "destination": "/index.html" },

@@ -1306,3 +1306,12 @@ html[data-theme="light"] .product-page .button.primary:hover, html[data-theme="l
 .tracking-order-grid li { display: flex; justify-content: space-between; gap: 1rem; }
 .tracking-carrier { padding-top: 1.25rem; border-top: 1px solid var(--line); }
 .tracking-entry { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.tracking-cancellation { display: grid; justify-items: start; gap: .5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+.tracking-cancellation .small { margin: 0; }
+.tracking-cancelled { margin: 1.25rem 0 0; }
+.track-cancel-dialog { width: min(34rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; margin: auto; padding: clamp(1rem, 4vw, 2rem); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); }
+.track-cancel-dialog::backdrop { background: #000a; }
+.track-cancel-dialog h2 { font-size: 1.5rem; }
+.track-cancel-dialog .field { margin-bottom: 1rem; }
+.track-cancel-dialog select { width: 100%; min-height: 44px; font-size: 1rem; }
+.track-cancel-dialog [data-cancel-status]:not(:empty) { margin: 0 0 1rem; color: var(--muted); }
