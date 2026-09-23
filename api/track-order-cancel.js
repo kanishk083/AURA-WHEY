@@ -12,8 +12,11 @@ const REASONS = new Map([
 ]);
 const attempts = new Map();
 const inFlight = new Map();
+const acceptedCancellations = new Set();
 const RATE_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT = 5;
+
+export function clearAcceptedCancellationState() { acceptedCancellations.clear(); }
 
 export const CANCEL_MUTATION = `mutation TrackOrderCancel($orderId: ID!, $refundMethod: OrderCancelRefundMethodInput!, $staffNote: String!) {
   orderCancel(orderId: $orderId, reason: CUSTOMER, notifyCustomer: true, restock: true, refundMethod: $refundMethod, staffNote: $staffNote) {
@@ -72,13 +75,24 @@ export const dependencies = {
 };
 
 async function confirmedResult(order, alreadyCancelled = false) {
+  acceptedCancellations.delete(order.id);
   return { status: 200, payload: { cancelled: true, alreadyCancelled, paymentStatus: order.displayFinancialStatus || null, refundStatus: refundStatus(order), order: publicOrder(order) } };
+}
+
+function processingResult() {
+  return { status: 202, payload: { status: 'processing', cancelled: false } };
 }
 
 export async function cancelTrackedOrder(body, deps = dependencies) {
   const request = validateCancellationBody(body);
   const { input, order: found, config } = await deps.resolve(request);
   if (found.cancelledAt) return confirmedResult(found, true);
+
+  if (acceptedCancellations.has(found.id)) {
+    const latest = await deps.latest(config, found.id);
+    if (latest && orderBelongsToInput(latest, input) && latest.cancelledAt) return confirmedResult(latest, true);
+    return processingResult();
+  }
 
   const existing = inFlight.get(found.id);
   if (existing) {
@@ -103,6 +117,7 @@ export async function cancelTrackedOrder(body, deps = dependencies) {
       if (latest && orderBelongsToInput(latest, input) && latest.cancelledAt) return confirmedResult(latest, true);
       fail(409, 'shopify_rejected');
     }
+    acceptedCancellations.add(found.id);
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       latest = await deps.latest(config, found.id);
@@ -110,7 +125,7 @@ export async function cancelTrackedOrder(body, deps = dependencies) {
       if (latest.cancelledAt) return confirmedResult(latest);
       if (attempt < 4) await deps.wait(350);
     }
-    return { status: 202, payload: { cancelled: false, pending: true, message: 'Cancellation is processing. Check the order again shortly.' } };
+    return processingResult();
   })();
 
   inFlight.set(found.id, operation);

@@ -1,5 +1,6 @@
-const { test, mock } = require('node:test');
+const { test, mock, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
+const { storefront } = require('./storefront-helper.cjs');
 
 process.env.SHOPIFY_STORE_DOMAIN = 'fixture.myshopify.com';
 process.env.SHOPIFY_ADMIN_CLIENT_ID = 'fixture-client';
@@ -8,6 +9,8 @@ process.env.SHOPIFY_ADMIN_CLIENT_SECRET = 'fixture-secret';
 const cancellationPromise = import('../api/track-order-cancel.js');
 const trackPromise = import('../api/track-order.js');
 const adminPromise = import('../api/_lib/shopify-admin.js');
+
+beforeEach(async () => { (await cancellationPromise).clearAcceptedCancellationState(); });
 
 const NOW = Date.parse('2026-09-24T10:00:00Z');
 function order(overrides = {}) {
@@ -32,7 +35,7 @@ function deps(initial, latest, cancel = async () => ({ job: { id: 'gid://shopify
   return {
     calls,
     value: {
-      resolve: async body => ({ input: { orderNumber: '1001', email: String(body.email).trim().toLowerCase() }, order: initial, config: { shopDomain: 'fixture.myshopify.com' } }),
+      resolve: async body => ({ input: { orderNumber: String(initial.number), email: String(body.email).trim().toLowerCase() }, order: initial, config: { shopDomain: 'fixture.myshopify.com' } }),
       now: () => NOW,
       wait: async () => {},
       latest: async () => { latestCalls += 1; return latestValues[Math.min(latestCalls - 1, latestValues.length - 1)]; },
@@ -90,7 +93,20 @@ test('async cancellation remains pending when cancelledAt cannot yet be confirme
   const result = await cancelTrackedOrder({ orderNumber: '1001', email: 'customer@example.com', reason: 'other' }, fixture.value);
   assert.equal(result.status, 202);
   assert.equal(result.payload.cancelled, false);
-  assert.equal(result.payload.pending, true);
+  assert.equal(result.payload.status, 'processing');
+  assert.equal(fixture.calls.cancel, 1);
+});
+
+test('#1002 accepted cancellation cannot submit a second mutation while Shopify converges', async () => {
+  const { cancelTrackedOrder } = await cancellationPromise;
+  const eligible = order({ id: 'gid://shopify/Order/1002', name: '#1002', number: 1002 });
+  const fixture = deps(eligible, eligible);
+  const body = { orderNumber: '#1002', email: 'customer@example.com', reason: 'changed_mind' };
+  const first = await cancelTrackedOrder(body, fixture.value);
+  const second = await cancelTrackedOrder(body, fixture.value);
+  assert.equal(first.payload.status, 'processing');
+  assert.equal(second.payload.status, 'processing');
+  assert.equal(fixture.calls.cancel, 1);
 });
 
 test('Shopify user error is rejected and does not claim success', async () => {
@@ -185,4 +201,40 @@ test('cancellation endpoint validates JSON and rate limits repeated attempts', a
   await handler(request, limited);
   assert.equal(limited.statusCode, 429);
   assert.equal(limited.headers['Retry-After'], '900');
+});
+
+test('#1002 frontend polls read-only status from processing to cancelled and never retries cancellation', async () => {
+  const fs = require('node:fs');
+  const source = fs.readFileSync('app.js', 'utf8');
+  assert.match(source, /payload\.status === 'processing'/);
+  assert.match(source, /pollTrackedCancellation\(lookupForm, result\)/);
+  assert.match(source, /await lookup\(lookupForm\)/);
+  assert.match(source, /await wait\(2500\)/);
+  assert.match(source, /Cancellation is still processing/);
+  assert.match(source, /data-check-order-status/);
+  const poller = source.slice(source.indexOf('async function pollTrackedCancellation'), source.indexOf('function openTrackCancellationDialog'));
+  assert.match(poller, /readTrackedOrder/);
+  assert.doesNotMatch(poller, /track-order\/cancel|orderCancel/);
+});
+
+test('#1002 frontend processing poll transitions to the cancelled/refunded render', async () => {
+  const { context, run } = storefront();
+  let reads = 0;
+  let rendered;
+  let exhausted = false;
+  context.pollForm = {};
+  context.pollResult = {};
+  context.pollLookup = async () => ++reads === 1
+    ? { cancelled: false, paymentStatus: 'PAID' }
+    : { cancelled: true, paymentStatus: 'REFUNDED', cancellation: { eligible: false, code: 'already_cancelled' } };
+  context.pollWait = async () => {};
+  context.pollRender = order => { rendered = order; };
+  context.pollExhausted = () => { exhausted = true; };
+  const confirmed = await run('pollTrackedCancellation(pollForm, pollResult, { attempts: 3, lookup: pollLookup, wait: pollWait, renderOrder: pollRender, showProcessing: pollExhausted })');
+  assert.equal(confirmed, true);
+  assert.equal(reads, 2);
+  assert.equal(rendered.cancelled, true);
+  assert.equal(rendered.paymentStatus, 'REFUNDED');
+  assert.equal(rendered.cancellation.eligible, false);
+  assert.equal(exhausted, false);
 });

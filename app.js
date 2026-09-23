@@ -907,7 +907,7 @@ function trackingResult(order) {
   const progress = stages.map(([key, label], index) => `<li class="tracking-step ${index <= rank ? 'is-complete' : ''} ${key === order.progress ? 'is-current' : ''}"><span>${index < rank ? '✓' : index + 1}</span><small>${label}</small></li>`).join('');
   const tracking = order.tracking.map(item => `<div class="tracking-entry"><strong>${escapeHtml(item.company || 'Carrier')}</strong>${item.number ? `<span>${escapeHtml(item.number)}</span>` : ''}${item.url ? `<a class="button-link secondary" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">Track shipment</a>` : ''}</div>`).join('');
   const cancellation = order.cancellation || { eligible: false, message: 'Cancellation unavailable' };
-  const cancelled = order.cancelled ? `<div class="result state-valid tracking-cancelled" role="status"><strong>ORDER CANCELLED</strong><p>Your cancellation has been confirmed. Any eligible refund is being returned to your original payment method.</p>${order.refundStatus ? `<p>Refund/payment status: ${escapeHtml(order.refundStatus)}</p>` : ''}</div>` : '';
+  const cancelled = order.cancelled ? `<div class="result state-valid tracking-cancelled" role="status"><strong>ORDER CANCELLED</strong><p>Your order has been cancelled successfully.</p>${order.paymentStatus || order.refundStatus ? `<p>Refund status: ${escapeHtml(order.paymentStatus || order.refundStatus)}</p>` : ''}</div>` : '';
   const cancellationAction = order.cancelled ? '' : cancellation.eligible
     ? '<button type="button" class="button secondary" data-track-cancel>Cancel order</button><p id="tracking-cancel-note" class="small">Cancellation available for this order.</p>'
     : `<button type="button" class="button secondary" disabled aria-describedby="tracking-cancel-note">Cancel order</button><p id="tracking-cancel-note" class="small">${escapeHtml(cancellation.message || 'Cancellation unavailable')}</p>`;
@@ -918,6 +918,55 @@ function bindTrackedOrderCancellation(order, lookupForm, result) {
   const trigger = result.querySelector('[data-track-cancel]');
   if (!trigger || !order.cancellation?.eligible) return;
   trigger.addEventListener('click', () => openTrackCancellationDialog(order, lookupForm, result, trigger), { once: true });
+}
+
+async function readTrackedOrder(lookupForm) {
+  const response = await fetch('/api/track-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ orderNumber: lookupForm.elements.orderNumber.value.trim(), email: lookupForm.elements.email.value.trim() }),
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.message || 'Order tracking is temporarily unavailable.');
+  return payload.order;
+}
+
+function renderTrackedOrder(order, lookupForm, result) {
+  result.innerHTML = trackingResult(order);
+  bindTrackedOrderCancellation(order, lookupForm, result);
+}
+
+function showCancellationProcessing(lookupForm, result) {
+  result.innerHTML = '<div class="result state-valid tracking-cancelled" role="status"><strong>Cancellation is still processing</strong><p>Shopify is processing your cancellation. Check your order again shortly.</p><button type="button" class="button secondary" data-check-order-status>Check order status</button></div>';
+  const check = result.querySelector('[data-check-order-status]');
+  check?.addEventListener('click', async () => {
+    check.disabled = true;
+    check.textContent = 'Checking order status...';
+    try {
+      const order = await readTrackedOrder(lookupForm);
+      if (order.cancelled) return renderTrackedOrder(order, lookupForm, result);
+      showCancellationProcessing(lookupForm, result);
+    } catch {
+      showCancellationProcessing(lookupForm, result);
+    }
+  }, { once: true });
+}
+
+async function pollTrackedCancellation(lookupForm, result, options = {}) {
+  const lookup = options.lookup || readTrackedOrder;
+  const wait = options.wait || (ms => new Promise(resolve => setTimeout(resolve, ms)));
+  const renderOrder = options.renderOrder || (order => renderTrackedOrder(order, lookupForm, result));
+  const showProcessing = options.showProcessing || (() => showCancellationProcessing(lookupForm, result));
+  const attempts = options.attempts || 8;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    await wait(2500);
+    try {
+      const order = await lookup(lookupForm);
+      if (order.cancelled) { renderOrder(order); return true; }
+    } catch { /* A transient read failure must not resubmit cancellation. */ }
+  }
+  showProcessing();
+  return false;
 }
 
 function openTrackCancellationDialog(order, lookupForm, result, trigger) {
@@ -949,15 +998,13 @@ function openTrackCancellationDialog(order, lookupForm, result, trigger) {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'This order cannot be cancelled online. Please contact AURA WHEY support.');
-      if (!payload.cancelled || !payload.order) {
-        status.textContent = payload.message || 'Cancellation is processing. Check the order again shortly.';
-        const keep = dialog.querySelector('[data-keep-order]');
-        keep.disabled = false;
-        keep.textContent = 'Close and check order';
+      if (payload.status === 'processing' && !payload.cancelled) {
+        dialog.close();
+        await pollTrackedCancellation(lookupForm, result);
         return;
       }
-      result.innerHTML = trackingResult(payload.order);
-      bindTrackedOrderCancellation(payload.order, lookupForm, result);
+      if (!payload.cancelled || !payload.order) throw new Error('This order cannot be cancelled online. Please contact AURA WHEY support.');
+      renderTrackedOrder(payload.order, lookupForm, result);
       dialog.close();
     } catch (error) {
       status.textContent = error.message;
@@ -1636,11 +1683,7 @@ async function handleForm(event) {
     if (!form.reportValidity()) return;
     submit.disabled = true; result.innerHTML = '<p class="small" role="status">Finding your order…</p>';
     try {
-      const response = await fetch('/api/track-order', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ orderNumber: form.elements.orderNumber.value.trim(), email: form.elements.email.value.trim() }) });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || 'Order tracking is temporarily unavailable.');
-      result.innerHTML = trackingResult(payload.order);
-      bindTrackedOrderCancellation(payload.order, form, result);
+      renderTrackedOrder(await readTrackedOrder(form), form, result);
     } catch (error) {
       result.innerHTML = `<div class="result state-invalid" role="alert"><strong>${error.message.includes('not found') ? 'No matching order' : 'Unable to find your order'}</strong><p>${escapeHtml(error.message)}</p></div>`;
     } finally { submit.disabled = false; }
