@@ -17,17 +17,17 @@ export function productForHandle(handle) {
   return { id, handle: product.handle, name: product.name };
 }
 
-function clean(value, max) {
-  return String(value ?? '').normalize('NFKC').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+function clean(value) {
+  return String(value ?? '').normalize('NFKC').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export function validateSubmission(body) {
   if (!body || typeof body !== 'object') fail(422, 'Enter a rating and review.');
   const product = productForHandle(body.productHandle);
-  const displayName = clean(body.displayName, 60);
-  const reviewText = clean(body.reviewText, 1000);
-  const rating = Number(body.rating);
-  if (!displayName || displayName.length < 2 || !Number.isInteger(rating) || rating < 1 || rating > 5 || reviewText.length < 10 || /[<>]/.test(displayName + reviewText)) fail(422, 'Enter your name, a rating from 1 to 5, and a review of at least 10 characters.');
+  const displayName = clean(body.displayName);
+  const reviewText = clean(body.reviewText);
+  const rating = body.rating;
+  if (displayName.length < 2 || displayName.length > 60 || !Number.isInteger(rating) || rating < 1 || rating > 5 || reviewText.length < 10 || reviewText.length > 1000 || /[<>]/.test(displayName + reviewText)) fail(422, 'Enter your name, a rating from 1 to 5, and a review of at least 10 characters.');
   if (body.website) fail(422, 'Unable to submit this review.');
   return { product, displayName, rating, reviewText };
 }
@@ -74,7 +74,7 @@ export async function createReview(request) {
 export function publicReview(review) { return { id: review.id, shopifyProductHandle: review.shopify_product_handle, productName: review.product_name, displayName: review.display_name, rating: review.rating, reviewText: review.review_text, createdAt: review.created_at }; }
 
 export async function listReviews(request) {
-  const params = new URL(request.url || 'http://localhost').searchParams;
+  const params = new URL(request.url || '/', 'http://localhost').searchParams;
   let path = 'reviews?select=id,shopify_product_handle,product_name,display_name,rating,review_text,created_at&order=created_at.desc&limit=' + LIMIT;
   if (params.get('scope') === 'home') path += '&shopify_product_handle=in.(aura-whey-rich-chocolate-1-kg,aura-whey-mawa-kulfi-1-kg)';
   else path += '&shopify_product_handle=eq.' + encodeURIComponent(productForHandle(params.get('product')).handle);

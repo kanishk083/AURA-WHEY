@@ -16,6 +16,58 @@ test('review validation resolves supported products and rejects unsafe input', a
   assert.throws(() => validateSubmission({ productHandle: 'aura-whey-rich-chocolate-1-kg', displayName: 'Rahul', rating: 5, reviewText: '<script>alert(1)</script>' }), { status: 422 });
 });
 
+test('review validation enforces every public input boundary', async () => {
+  const { validateSubmission } = await mod;
+  process.env.REVIEWS_RICH_CHOCOLATE_PRODUCT_ID = 'gid://shopify/Product/101';
+  process.env.REVIEWS_MAWA_KULFI_PRODUCT_ID = 'gid://shopify/Product/102';
+  const base = { productHandle: 'aura-whey-mawa-kulfi-1-kg', displayName: 'Ka', rating: 4, reviewText: '1234567890', website: '' };
+  assert.equal(validateSubmission(base).displayName, 'Ka');
+  assert.equal(validateSubmission({ ...base, rating: 1 }).rating, 1);
+  assert.equal(validateSubmission({ ...base, rating: 5 }).rating, 5);
+  assert.equal(validateSubmission({ ...base, reviewText: 'VERY NICEEEE, GG FINALLY WORKED' }).reviewText, 'VERY NICEEEE, GG FINALLY WORKED');
+  assert.equal(validateSubmission({ ...base, productHandle: 'aura-whey-rich-chocolate-1-kg' }).product.name, 'Rich Chocolate');
+  for (const invalid of [
+    { ...base, displayName: 'K' },
+    { ...base, displayName: 'K'.repeat(61) },
+    { ...base, rating: 0 },
+    { ...base, rating: 6 },
+    { ...base, rating: '4' },
+    { ...base, reviewText: '123456789' },
+    { ...base, reviewText: 'K'.repeat(1001) },
+    { ...base, productHandle: 'unknown' },
+    { ...base, website: 'bot.example' },
+  ]) assert.throws(() => validateSubmission(invalid), { status: 422 });
+});
+
+test('Vercel relative review URLs reach the expected Supabase REST reads', async t => {
+  const { listReviews } = await mod;
+  process.env.REVIEWS_RICH_CHOCOLATE_PRODUCT_ID = 'gid://shopify/Product/101';
+  process.env.REVIEWS_MAWA_KULFI_PRODUCT_ID = 'gid://shopify/Product/102';
+  const calls = [];
+  t.mock.method(global, 'fetch', async url => { calls.push(url); return { ok: true, status: 200, json: async () => [] }; });
+  await listReviews({ url: '/api/reviews?product=aura-whey-mawa-kulfi-1-kg' });
+  await listReviews({ url: '/api/reviews?product=aura-whey-rich-chocolate-1-kg' });
+  await listReviews({ url: '/api/reviews?scope=home' });
+  assert.match(calls[0], /shopify_product_handle=eq\.aura-whey-mawa-kulfi-1-kg/);
+  assert.match(calls[1], /shopify_product_handle=eq\.aura-whey-rich-chocolate-1-kg/);
+  assert.match(calls[2], /shopify_product_handle=in\.\(aura-whey-rich-chocolate-1-kg,aura-whey-mawa-kulfi-1-kg\)/);
+});
+
+test('a fully valid Mawa Kulfi request reaches the Supabase anti-spam RPC', async t => {
+  const { createReview } = await mod;
+  process.env.REVIEWS_MAWA_KULFI_PRODUCT_ID = 'gid://shopify/Product/102';
+  process.env.REVIEWS_IP_HASH_SECRET = 'fixture-review-secret-012345678901234567890';
+  const calls = [];
+  t.mock.method(global, 'fetch', async (url) => {
+    calls.push(url);
+    if (url.includes('/rpc/check_review_antispam')) return { ok: true, status: 200, json: async () => ({ allowed: true, reason: 'allowed' }) };
+    return { ok: true, status: 201, json: async () => null };
+  });
+  await createReview(request({ productHandle: 'aura-whey-mawa-kulfi-1-kg', displayName: 'KANISHK', rating: 4, reviewText: 'VERY NICEEEE, GG FINALLY WORKED', website: '' }));
+  assert.match(calls[0], /\/rest\/v1\/rpc\/check_review_antispam$/);
+  assert.match(calls[1], /\/rest\/v1\/reviews$/);
+});
+
 test('POST persists canonical product data and returns safe public review', async t => {
   const { createReview } = await mod;
   process.env.REVIEWS_RICH_CHOCOLATE_PRODUCT_ID = 'gid://shopify/Product/101'; process.env.REVIEWS_IP_HASH_SECRET = 'fixture-review-secret-012345678901234567890';
