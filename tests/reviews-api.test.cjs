@@ -129,8 +129,27 @@ test('review API responses and logs never expose Supabase secret values', async 
   const { default: handler } = await import('../api/reviews/index.js');
   const key = 'sb_secret_response-log-fixture'; process.env.SUPABASE_SERVICE_ROLE_KEY = key;
   const logged = []; t.mock.method(console, 'log', (...values) => logged.push(values)); t.mock.method(console, 'error', (...values) => logged.push(values));
-  t.mock.method(global, 'fetch', async () => ({ ok: false, status: 401, json: async () => ({ message: key }) }));
+  t.mock.method(global, 'fetch', async () => ({ ok: false, status: 401, statusText: 'Unauthorized', json: async () => ({ code: 'PGRST301', message: `Invalid key ${key}`, details: key, hint: null }) }));
   const res = response(); await handler({ method: 'GET', url: 'https://example.test/api/reviews?scope=home' }, res);
   assert.equal(res.statusCode, 502); assert.equal(res.body.message, 'Reviews are temporarily unavailable.');
   assert.equal(JSON.stringify(res.body).includes(key), false); assert.equal(JSON.stringify(logged).includes(key), false);
+  assert.equal(logged[0][0], '[reviews:supabase]');
+  assert.equal(logged[0][1].operation, 'list_reviews');
+  assert.equal(logged[0][1].status, 401);
+  assert.equal(logged[0][1].code, 'PGRST301');
+  assert.match(logged[0][1].message, /\[redacted\]/);
+});
+
+test('Supabase network failures are logged safely while the API response stays generic', async t => {
+  const { default: handler } = await import('../api/reviews/index.js');
+  const key = 'sb_secret_network-log-fixture'; process.env.SUPABASE_SERVICE_ROLE_KEY = key;
+  const logged = []; t.mock.method(console, 'error', (...values) => logged.push(values));
+  t.mock.method(global, 'fetch', async () => { throw new Error(`connect failed using ${key}`); });
+  const res = response(); await handler({ method: 'GET', url: '/api/reviews?scope=home' }, res);
+  assert.equal(res.statusCode, 502);
+  assert.deepEqual(res.body, { message: 'Reviews are temporarily unavailable.' });
+  assert.equal(logged[0][0], '[reviews:supabase-network]');
+  assert.equal(logged[0][1].operation, 'list_reviews');
+  assert.match(logged[0][1].error, /\[redacted\]/);
+  assert.equal(JSON.stringify(logged).includes(key), false);
 });

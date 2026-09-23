@@ -48,16 +48,45 @@ function fingerprint(value) {
 async function antiSpam(ip, input) {
   const ipHash = fingerprint(ip);
   const duplicateHash = fingerprint(`${ipHash}\n${input.product.id}\n${input.displayName.toLowerCase()}\n${input.reviewText.toLowerCase()}`);
-  const result = await db('rpc/check_review_antispam', { method: 'POST', body: JSON.stringify({ p_ip_hash: ipHash, p_duplicate_hash: duplicateHash }) });
+  const result = await db('rpc/check_review_antispam', { method: 'POST', body: JSON.stringify({ p_ip_hash: ipHash, p_duplicate_hash: duplicateHash }) }, 'check_antispam');
   const decision = Array.isArray(result) ? result[0] : result;
   if (!decision || decision.allowed !== true) fail(decision?.reason === 'rate_limited' ? 429 : decision?.reason === 'duplicate' ? 409 : 503, decision?.reason === 'rate_limited' ? 'Please wait before submitting another review.' : decision?.reason === 'duplicate' ? 'This review was already submitted recently.' : 'Reviews are temporarily unavailable.');
 }
 
-async function db(path, options = {}) {
+function safeDiagnostic(value) {
+  if (value == null) return null;
+  let result = String(value);
+  for (const name of ['SUPABASE_SERVICE_ROLE_KEY', 'REVIEWS_IP_HASH_SECRET', 'SHOPIFY_ADMIN_CLIENT_SECRET', 'SHOPIFY_ADMIN_ACCESS_TOKEN']) {
+    const secret = process.env[name];
+    if (secret) result = result.split(secret).join('[redacted]');
+  }
+  return result.slice(0, 500);
+}
+
+async function db(path, options = {}, operation = 'reviews_request') {
   const { url, key } = supabaseConfig();
   const authorization = /^eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(key) ? { Authorization: `Bearer ${key}` } : {};
-  const response = await fetch(`${url}/rest/v1/${path}`, { ...options, headers: { apikey: key, ...authorization, 'Content-Type': 'application/json', ...(options.headers || {}) }, signal: AbortSignal.timeout(10000) });
-  if (!response.ok) fail(502, 'Reviews are temporarily unavailable.');
+  let response;
+  try {
+    response = await fetch(`${url}/rest/v1/${path}`, { ...options, headers: { apikey: key, ...authorization, 'Content-Type': 'application/json', ...(options.headers || {}) }, signal: AbortSignal.timeout(10000) });
+  } catch (error) {
+    console.error('[reviews:supabase-network]', { operation, error: safeDiagnostic(error instanceof Error ? error.message : 'Unknown fetch error') });
+    fail(502, 'Reviews are temporarily unavailable.');
+  }
+  if (!response.ok) {
+    let parsedError = null;
+    try { parsedError = await response.json(); } catch { /* Supabase can return an empty or non-JSON error body. */ }
+    console.error('[reviews:supabase]', {
+      operation,
+      status: response.status,
+      statusText: safeDiagnostic(response.statusText),
+      code: safeDiagnostic(parsedError?.code),
+      message: safeDiagnostic(parsedError?.message),
+      details: safeDiagnostic(parsedError?.details),
+      hint: safeDiagnostic(parsedError?.hint),
+    });
+    fail(502, 'Reviews are temporarily unavailable.');
+  }
   return response.status === 204 ? null : response.json();
 }
 
@@ -67,7 +96,7 @@ export async function createReview(request) {
   const ip = String(request.headers['x-forwarded-for'] || request.socket?.remoteAddress || 'unknown').split(',')[0].trim();
   await antiSpam(ip, input);
   const review = { id: randomUUID(), shopify_product_id: input.product.id, shopify_product_handle: input.product.handle, product_name: input.product.name, display_name: input.displayName, rating: input.rating, review_text: input.reviewText, created_at: new Date().toISOString() };
-  await db('reviews', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(review) });
+  await db('reviews', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(review) }, 'create_review');
   return publicReview(review);
 }
 
@@ -78,5 +107,5 @@ export async function listReviews(request) {
   let path = 'reviews?select=id,shopify_product_handle,product_name,display_name,rating,review_text,created_at&order=created_at.desc&limit=' + LIMIT;
   if (params.get('scope') === 'home') path += '&shopify_product_handle=in.(aura-whey-rich-chocolate-1-kg,aura-whey-mawa-kulfi-1-kg)';
   else path += '&shopify_product_handle=eq.' + encodeURIComponent(productForHandle(params.get('product')).handle);
-  return (await db(path)).map(publicReview);
+  return (await db(path, {}, 'list_reviews')).map(publicReview);
 }
