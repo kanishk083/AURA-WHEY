@@ -66,11 +66,13 @@ test('only the correct anonymous owner token can delete a review', async t => {
   t.mock.method(global, 'fetch', async (url, options) => {
     calls.push({ url, method: options.method || 'GET', body: options.body });
     if (url.includes('/rpc/check_review_delete_rate_limit')) return ok([{ allowed: true, reason: 'allowed' }]);
+    if (url.includes('/storage/v1/object/review-images')) return ok([]);
     if ((options.method || 'GET') === 'DELETE') return ok(null, 204);
-    return ok([{ id: reviewId, owner_token_hash: storedHash }]);
+    return ok([{ id: reviewId, owner_token_hash: storedHash, image_paths: [`${reviewId}/photo.webp`] }]);
   });
   assert.deepEqual(await deleteOwnedReview(request({ ownerToken: token }), reviewId), { deleted: true, reviewId });
-  assert.equal(calls.filter(call => call.method === 'DELETE').length, 1);
+  assert.equal(calls.filter(call => call.method === 'DELETE').length, 2);
+  assert.equal(calls.filter(call => call.url.includes('/storage/v1/object/review-images')).length, 1);
   assert.ok(calls.every(call => !String(call.body || '').includes(token)));
 });
 
@@ -110,12 +112,18 @@ test('migration enforces uniqueness, cascading deletes, distributed limits and p
   assert.match(sql, /visitor_actions >= 20 or ip_actions >= 60/i);
   assert.match(sql, /revoke all[\s\S]*from public, anon, authenticated/i);
   assert.match(sql, /grant execute[\s\S]*to service_role/i);
+  const imageSql = fs.readFileSync('docs/REVIEWS-IMAGES-SUPABASE.sql', 'utf8');
+  assert.match(imageSql, /add column if not exists image_paths text\[\]/i);
+  assert.match(imageSql, /cardinality\(image_paths\) <= 3/i);
+  assert.match(imageSql, /'review-images'.*true.*800000/is);
+  assert.match(imageSql, /list_public_reviews_with_images/i);
+  assert.match(imageSql, /revoke all[\s\S]*from public, anon, authenticated/i);
 });
 
 test('public review serialization never exposes ownership, visitor, IP or Supabase data', async () => {
   const { publicReview } = await reviews;
   const result = publicReview({ id: reviewId, shopify_product_handle: 'aura-whey-mawa-kulfi-1-kg', product_name: 'Mawa Kulfi', display_name: 'K', rating: 5, review_text: 'Excellent product.', created_at: 'now', like_count: 2, liked: false, owner_token_hash: 'secret', visitor_hash: 'visitor', ip_hash: 'ip', apikey: 'key' });
-  assert.deepEqual(Object.keys(result), ['id', 'shopifyProductHandle', 'productName', 'displayName', 'rating', 'reviewText', 'createdAt', 'likeCount', 'liked']);
+  assert.deepEqual(Object.keys(result), ['id', 'shopifyProductHandle', 'productName', 'displayName', 'rating', 'reviewText', 'createdAt', 'imageUrls', 'likeCount', 'liked']);
   assert.equal(JSON.stringify(result).includes('secret'), false);
   assert.equal(JSON.stringify(result).includes('visitor'), false);
 });

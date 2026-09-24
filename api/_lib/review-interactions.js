@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import { ReviewError, ipHash, ownerTokenHash, reviewDb, visitorHash } from './reviews.js';
+import { ReviewError, ipHash, ownerTokenHash, removeReviewImages, reviewDb, visitorHash } from './reviews.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
@@ -58,7 +58,7 @@ export async function deleteOwnedReview(request, reviewId) {
   if (!TOKEN.test(ownerToken)) fail(403, 'Unable to delete this review.');
   const rate = decision(await reviewDb('rpc/check_review_delete_rate_limit', { method: 'POST', body: JSON.stringify({ p_ip_hash: ipHash(requestIp(request)) }) }, 'delete_review_rate_limit'));
   if (!rate?.allowed) fail(rate?.reason === 'rate_limited' ? 429 : 502, rate?.reason === 'rate_limited' ? 'Please wait before trying again.' : 'Reviews are temporarily unavailable.');
-  const rows = await reviewDb(`reviews?select=id,owner_token_hash&id=eq.${encodeURIComponent(id)}&limit=1`, {}, 'get_review_owner');
+  const rows = await reviewDb(`reviews?select=id,owner_token_hash,image_paths&id=eq.${encodeURIComponent(id)}&limit=1`, {}, 'get_review_owner');
   const stored = rows?.[0]?.owner_token_hash;
   const supplied = ownerTokenHash(ownerToken);
   if (!stored || !/^[0-9a-f]{64}$/.test(stored)) fail(403, 'Unable to delete this review.');
@@ -66,5 +66,6 @@ export async function deleteOwnedReview(request, reviewId) {
   const suppliedBytes = Buffer.from(supplied, 'hex');
   if (storedBytes.length !== suppliedBytes.length || !timingSafeEqual(storedBytes, suppliedBytes)) fail(403, 'Unable to delete this review.');
   await reviewDb(`reviews?id=eq.${encodeURIComponent(id)}&owner_token_hash=eq.${encodeURIComponent(stored)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, 'delete_review');
+  await removeReviewImages(Array.isArray(rows[0].image_paths) ? rows[0].image_paths : []);
   return { deleted: true, reviewId: id };
 }

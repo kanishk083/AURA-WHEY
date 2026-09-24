@@ -51,7 +51,7 @@ test('Vercel relative review URLs reach the expected Supabase REST reads', async
   await listReviews({ url: '/api/reviews?product=aura-whey-rich-chocolate-1-kg' });
   await listReviews({ url: '/api/reviews?scope=home' });
   assert.equal(calls.length, 3);
-  assert.match(calls[0].url, /\/rpc\/list_public_reviews$/);
+  assert.match(calls[0].url, /\/rpc\/list_public_reviews_with_images$/);
   assert.equal(calls[0].body.p_product_handle, 'aura-whey-mawa-kulfi-1-kg');
   assert.equal(calls[1].body.p_product_handle, 'aura-whey-rich-chocolate-1-kg');
   assert.equal(calls[2].body.p_scope, 'home');
@@ -94,6 +94,35 @@ test('successful Supabase 201 with an empty body still returns the review and ow
   assert.equal(res.statusCode, 201);
   assert.equal(res.body.review.displayName, 'Rahul');
   assert.match(res.body.ownerToken, /^[A-Za-z0-9_-]{43}$/);
+});
+
+test('review photos are validated, compressed and persisted as server-owned storage paths', async t => {
+  const sharp = (await import('sharp')).default;
+  const { createReview } = await mod;
+  process.env.REVIEWS_RICH_CHOCOLATE_PRODUCT_ID = 'gid://shopify/Product/101';
+  process.env.REVIEWS_IP_HASH_SECRET = 'fixture-review-secret-012345678901234567890';
+  const source = await sharp({ create: { width: 12, height: 12, channels: 3, background: '#d4a84f' } }).png().toBuffer();
+  const image = `data:image/png;base64,${source.toString('base64')}`;
+  let stored; let uploaded = 0;
+  t.mock.method(global, 'fetch', async (url, options) => {
+    if (url.includes('/rpc/check_review_antispam')) return { ok: true, status: 200, json: async () => ({ allowed: true, reason: 'allowed' }) };
+    if (url.includes('/storage/v1/object/review-images/')) { uploaded += 1; assert.equal(options.headers['Content-Type'], 'image/webp'); return { ok: true, status: 200, text: async () => '{"Key":"saved"}' }; }
+    stored = JSON.parse(options.body); return { ok: true, status: 201, text: async () => '' };
+  });
+  const created = await createReview(request({ productHandle: 'aura-whey-rich-chocolate-1-kg', displayName: 'Rahul', rating: 5, reviewText: 'Photo review with enough detail.', images: [image] }));
+  assert.equal(uploaded, 1);
+  assert.equal(stored.image_paths.length, 1);
+  assert.match(stored.image_paths[0], new RegExp(`^${created.id}/[0-9a-f-]+\\.webp$`));
+  assert.equal(created.imageUrls.length, 1);
+  assert.match(created.imageUrls[0], /storage\/v1\/object\/public\/review-images\//);
+  assert.equal(JSON.stringify(created).includes(image), false);
+});
+
+test('review photo validation rejects excessive or malformed image input', async () => {
+  const { validateSubmission } = await mod;
+  const base = { productHandle: 'aura-whey-rich-chocolate-1-kg', displayName: 'Rahul', rating: 5, reviewText: 'A detailed product review.' };
+  assert.throws(() => validateSubmission({ ...base, images: ['a', 'b', 'c', 'd'] }), { status: 422 });
+  assert.throws(() => validateSubmission({ ...base, images: [{ data: 'not-a-string' }] }), { status: 422 });
 });
 
 test('rate limiting and honeypot reject abusive submissions', async () => {
