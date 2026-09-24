@@ -98,7 +98,12 @@ export async function reviewDb(path, options = {}, operation = 'reviews_request'
     });
     fail(502, 'Reviews are temporarily unavailable.');
   }
-  return response.status === 204 ? null : response.json();
+  if (response.status === 204) return null;
+  if (typeof response.text !== 'function') return response.json();
+  const raw = await response.text();
+  if (!raw.trim()) return null;
+  try { return JSON.parse(raw); }
+  catch { fail(502, 'Reviews are temporarily unavailable.'); }
 }
 
 export async function createReview(request) {

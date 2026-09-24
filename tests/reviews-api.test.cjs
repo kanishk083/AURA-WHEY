@@ -81,6 +81,21 @@ test('POST persists canonical product data and returns safe public review', asyn
   assert.equal(saved.shopify_product_id, 'gid://shopify/Product/101'); assert.equal(saved.product_name, 'Rich Chocolate'); assert.match(saved.owner_token_hash, /^[0-9a-f]{64}$/); assert.equal(review.displayName, 'Rahul'); assert.match(review.ownerToken, /^[A-Za-z0-9_-]{43}$/); assert.notEqual(saved.owner_token_hash, review.ownerToken); assert.equal(review.status, undefined); assert.equal(JSON.stringify(review).includes('<script>'), false);
 });
 
+test('successful Supabase 201 with an empty body still returns the review and owner token', async t => {
+  const { default: handler } = await import('../api/reviews/index.js');
+  process.env.REVIEWS_RICH_CHOCOLATE_PRODUCT_ID = 'gid://shopify/Product/101';
+  process.env.REVIEWS_IP_HASH_SECRET = 'fixture-review-secret-012345678901234567890';
+  t.mock.method(global, 'fetch', async url => {
+    if (url.includes('/rpc/check_review_antispam')) return { ok: true, status: 200, json: async () => ({ allowed: true, reason: 'allowed' }) };
+    return { ok: true, status: 201, statusText: 'Created', text: async () => '' };
+  });
+  const res = response();
+  await handler({ method: 'POST', body: { productHandle: 'aura-whey-rich-chocolate-1-kg', displayName: 'Rahul', rating: 5, reviewText: 'Really smooth and tastes great.' }, headers: { 'x-forwarded-for': '203.0.113.30' } }, res);
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.body.review.displayName, 'Rahul');
+  assert.match(res.body.ownerToken, /^[A-Za-z0-9_-]{43}$/);
+});
+
 test('rate limiting and honeypot reject abusive submissions', async () => {
   const { validateSubmission } = await mod;
   process.env.REVIEWS_RICH_CHOCOLATE_PRODUCT_ID = 'gid://shopify/Product/101'; assert.throws(() => validateSubmission({ productHandle: 'aura-whey-rich-chocolate-1-kg', displayName: 'Bot', rating: 5, reviewText: 'A real review with enough words.', website: 'spam' }), { status: 422 });
