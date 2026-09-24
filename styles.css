@@ -523,6 +523,18 @@ main { width: 100%; padding-top: calc(var(--banner-h) + var(--header-h)); overfl
 .review-stars span { color: var(--line-strong); }
 .review-copy { position: relative; z-index: 1; flex: 1; margin: .9rem 0 1.2rem; color: var(--text); font-size: 1rem; line-height: 1.7; white-space: pre-wrap; }
 .review-badge { position: relative; z-index: 1; display: inline-flex; padding: .35rem .6rem; border: 1px solid var(--line); border-radius: 999px; color: var(--soft); font: 700 .62rem/1.2 Montserrat, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.review-card-actions { position: relative; z-index: 1; display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+.review-like, .review-delete { border: 0; background: transparent; color: var(--soft); cursor: pointer; font: 700 .72rem/1.2 Montserrat, sans-serif; padding: .35rem .1rem; }
+.review-like { display: inline-flex; align-items: center; gap: .28rem; font-size: .82rem; }
+.review-like:hover, .review-like:focus-visible, .review-like.is-liked { color: #ef5350; }
+.review-like:disabled, .review-delete:disabled { cursor: wait; opacity: .55; }
+.review-delete { margin-left: auto; text-decoration: underline; text-underline-offset: .2em; }
+.review-delete:hover, .review-delete:focus-visible { color: var(--gold); }
+.review-delete-dialog { width: min(92vw, 28rem); border: 1px solid var(--line); border-radius: 14px; background: #171613; color: var(--cream); padding: 1.5rem; box-shadow: 0 24px 80px #000b; }
+.review-delete-dialog::backdrop { background: #000b; }
+.review-delete-dialog h2 { margin: 0 0 .65rem; font: 800 1.25rem/1.2 Montserrat, sans-serif; }
+.review-delete-dialog p { color: var(--soft); margin: 0 0 1.25rem; }
+.review-delete-dialog menu { display: flex; justify-content: flex-end; gap: .65rem; margin: 0; padding: 0; }
 .review-empty { min-height: 11rem; display: flex; align-items: center; gap: 1.25rem; padding: clamp(1.25rem, 3vw, 2rem); border: 1px dashed color-mix(in srgb, var(--gold) 45%, var(--line)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface) 82%, transparent); }
 .review-empty > span { color: var(--gold); font: 700 clamp(2.5rem, 5vw, 4rem)/1 Montserrat, sans-serif; }
 .review-empty h3 { margin: 0 0 .35rem; color: var(--text); font-size: clamp(1.1rem, 2vw, 1.4rem); }

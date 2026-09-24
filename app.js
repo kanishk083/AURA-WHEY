@@ -589,13 +589,27 @@ function shopInvitation() {
 
 const approvedReviews = Object.freeze([]);
 let reviewData = { home: null, product: null };
+const REVIEW_OWNER_KEY = 'aura_review_owners';
+const REVIEW_VISITOR_KEY = 'aura_review_visitor';
+
+function reviewOwners() { try { return JSON.parse(localStorage.getItem(REVIEW_OWNER_KEY) || '{}'); } catch { return {}; } }
+function saveReviewOwners(owners) { localStorage.setItem(REVIEW_OWNER_KEY, JSON.stringify(owners)); }
+function reviewVisitorId() {
+  let id = localStorage.getItem(REVIEW_VISITOR_KEY);
+  if (/^[A-Za-z0-9_-]{43}$/.test(id || '')) return id;
+  const bytes = new Uint8Array(32); crypto.getRandomValues(bytes);
+  id = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  localStorage.setItem(REVIEW_VISITOR_KEY, id); return id;
+}
 
 function reviewCard(review) {
   const rating = Math.max(1, Math.min(5, Number(review.rating) || 1));
   const name = String(review.displayName || review.name || 'Aura Whey customer').trim();
   const initials = name.split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join('').toUpperCase() || 'AW';
   const badge = review.verified ? 'Verified purchase' : 'Customer review';
-  return `<article class="review-card"><div class="review-card-top"><span class="review-avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(review.productName || review.flavour || state.flavour)}</span></div></div><div class="review-stars" aria-label="${rating} out of 5 stars">${'\u2605'.repeat(rating)}<span aria-hidden="true">${'\u2606'.repeat(5 - rating)}</span></div><p class="review-copy">\u201c${escapeHtml(review.reviewText || review.text || '')}\u201d</p><span class="review-badge">${escapeHtml(badge)}</span></article>`;
+  const id = String(review.id || '');
+  const owned = Boolean(id && reviewOwners()[id]);
+  return `<article class="review-card" data-review-id="${escapeHtml(id)}"><div class="review-card-top"><span class="review-avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(review.productName || review.flavour || state.flavour)}</span></div></div><div class="review-stars" aria-label="${rating} out of 5 stars">${'\u2605'.repeat(rating)}<span aria-hidden="true">${'\u2606'.repeat(5 - rating)}</span></div><p class="review-copy">\u201c${escapeHtml(review.reviewText || review.text || '')}\u201d</p><div class="review-card-actions"><span class="review-badge">${escapeHtml(badge)}</span>${id ? `<button type="button" class="review-like${review.liked ? ' is-liked' : ''}" data-review-like aria-pressed="${review.liked ? 'true' : 'false'}"><span aria-hidden="true">${review.liked ? '\u2665' : '\u2661'}</span> <b>${Number(review.likeCount || 0)}</b></button>${owned ? '<button type="button" class="review-delete" data-review-delete>Delete review</button>' : ''}` : ''}</div></article>`;
 }
 
 function approvedReviewCards(reviews = approvedReviews, scope = 'product') {
@@ -661,7 +675,7 @@ async function loadReviews(scope = 'product') {
   const section = document.querySelector(`[data-review-scope="${scope}"]`);
   if (section) section.querySelector('.review-board').innerHTML = '<p class="review-loading" role="status">Loading reviews...</p>';
   try {
-    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    const response = await fetch(url, { headers: { Accept: 'application/json', 'X-Aura-Review-Visitor': reviewVisitorId() } });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Reviews are temporarily unavailable.');
     reviewData[scope] = result.reviews || [];
@@ -669,8 +683,30 @@ async function loadReviews(scope = 'product') {
     if (section) section.querySelector('.review-board').innerHTML = `<p class="review-error" role="alert">${escapeHtml(error.message)}</p>`;
     return;
   }
-  if (section) section.querySelector('.review-board').innerHTML = approvedReviewCards(reviewData[scope], scope);
+  if (section) { section.querySelector('.review-board').innerHTML = approvedReviewCards(reviewData[scope], scope); bindReviewInteractions(section); }
 }
+
+function updateReviewState(id, values) { for (const scope of ['home', 'product']) if (reviewData[scope]) reviewData[scope] = reviewData[scope].map(review => review.id === id ? { ...review, ...values } : review); }
+
+async function toggleReviewLike(button) {
+  if (button.disabled) return;
+  const id = button.closest('[data-review-id]')?.dataset.reviewId; if (!id) return;
+  const wasLiked = button.getAttribute('aria-pressed') === 'true'; const count = Number(button.querySelector('b').textContent) || 0;
+  button.disabled = true; button.classList.toggle('is-liked', !wasLiked); button.setAttribute('aria-pressed', String(!wasLiked)); button.querySelector('span').textContent = wasLiked ? '\u2661' : '\u2665'; button.querySelector('b').textContent = String(Math.max(0, count + (wasLiked ? -1 : 1)));
+  try { const response = await fetch(`/api/reviews/${encodeURIComponent(id)}/like`, { method: wasLiked ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ visitorId: reviewVisitorId() }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.message || 'Unable to update this review.'); updateReviewState(id, payload); button.classList.toggle('is-liked', payload.liked); button.setAttribute('aria-pressed', String(payload.liked)); button.querySelector('span').textContent = payload.liked ? '\u2665' : '\u2661'; button.querySelector('b').textContent = String(payload.likeCount); }
+  catch (error) { button.classList.toggle('is-liked', wasLiked); button.setAttribute('aria-pressed', String(wasLiked)); button.querySelector('span').textContent = wasLiked ? '\u2665' : '\u2661'; button.querySelector('b').textContent = String(count); showToast(error.message); }
+  finally { button.disabled = false; }
+}
+
+function confirmReviewDelete(button) {
+  const id = button.closest('[data-review-id]')?.dataset.reviewId; const token = reviewOwners()[id]; if (!id || !token) return;
+  const dialog = document.createElement('dialog'); dialog.className = 'review-delete-dialog'; dialog.innerHTML = '<form method="dialog"><h2>Delete your review?</h2><p>This permanently removes your review.</p><div class="button-row"><button type="button" class="button secondary" data-keep-review>Keep review</button><button type="button" class="button primary" data-confirm-review-delete>Delete review</button></div><p role="status"></p></form>';
+  document.body.append(dialog); dialog.querySelector('[data-keep-review]').onclick = () => dialog.close(); dialog.onclose = () => dialog.remove();
+  dialog.querySelector('[data-confirm-review-delete]').onclick = async event => { const status = dialog.querySelector('[role=status]'); event.currentTarget.disabled = true; status.textContent = 'Deleting review...'; try { const response = await fetch(`/api/reviews/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ ownerToken: token }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.message || 'Unable to delete this review.'); const owners = reviewOwners(); delete owners[id]; saveReviewOwners(owners); for (const scope of ['home','product']) if (reviewData[scope]) reviewData[scope] = reviewData[scope].filter(review => review.id !== id); document.querySelectorAll(`[data-review-id="${id}"]`).forEach(node => node.remove()); dialog.close(); showToast('Review deleted.'); } catch (error) { status.textContent = error.message; event.currentTarget.disabled = false; } };
+  dialog.showModal();
+}
+
+function bindReviewInteractions(root = document) { root.querySelectorAll('[data-review-like]').forEach(button => { button.onclick = () => toggleReviewLike(button); }); root.querySelectorAll('[data-review-delete]').forEach(button => { button.onclick = () => confirmReviewDelete(button); }); }
 
 function loadReviewsForPage() {
   if (currentRoute() === 'shop') loadReviews('product');
@@ -1665,8 +1701,13 @@ async function handleForm(event) {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Unable to publish your review.');
       result.textContent = 'Thanks — your review is now live.';
+      if (payload.ownerToken && payload.review?.id) {
+        const owners = reviewOwners();
+        owners[payload.review.id] = payload.ownerToken;
+        saveReviewOwners(owners);
+      }
       form.reset(); reviewData.product = [payload.review, ...(reviewData.product || [])];
-      const board = document.querySelector('[data-review-scope="product"] .review-board'); if (board) board.innerHTML = approvedReviewCards(reviewData.product, 'product');
+      const board = document.querySelector('[data-review-scope="product"] .review-board'); if (board) { board.innerHTML = approvedReviewCards(reviewData.product, 'product'); bindReviewInteractions(board); }
     } catch (error) { result.textContent = error.message; }
     finally { submit.disabled = false; }
     return;

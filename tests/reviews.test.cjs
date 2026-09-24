@@ -55,3 +55,25 @@ test('product reviews use compact horizontal cards with two-way controls', () =>
   assert.ok(markup.includes('data-action="reviews-prev"'));
   assert.ok(markup.includes('data-action="reviews-next"'));
 });
+
+test('review cards expose likes and deletion only to the owning browser', () => {
+  const { run, storage } = storefront();
+  const id = '123e4567-e89b-42d3-a456-426614174000';
+  storage.set('aura_review_owners', JSON.stringify({ [id]: 'owner-token' }));
+  const owned = run(`reviewCard({ id: '${id}', productName: 'Mawa Kulfi', displayName: 'Owner', rating: 5, reviewText: 'Excellent product.', likeCount: 12, liked: true })`);
+  const other = run(`reviewCard({ id: '123e4567-e89b-42d3-a456-426614174001', productName: 'Mawa Kulfi', displayName: 'Other', rating: 4, reviewText: 'Tastes very good.', likeCount: 2, liked: false })`);
+  assert.ok(owned.includes('data-review-like'));
+  assert.ok(owned.includes('aria-pressed="true"'));
+  assert.ok(owned.includes('<b>12</b>'));
+  assert.ok(owned.includes('data-review-delete'));
+  assert.ok(!other.includes('data-review-delete'));
+});
+
+test('review deletion uses confirmation and never places owner tokens in URLs', () => {
+  const source = require('node:fs').readFileSync('app.js', 'utf8');
+  assert.match(source, /Delete your review\?/);
+  assert.match(source, /This permanently removes your review\./);
+  assert.match(source, /method: 'DELETE'/);
+  assert.match(source, /body: JSON\.stringify\(\{ ownerToken: token \}\)/);
+  assert.doesNotMatch(source, /ownerToken=.*encodeURIComponent/);
+});

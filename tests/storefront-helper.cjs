@@ -12,7 +12,9 @@ function storefront() {
     document: { querySelector: () => null, querySelectorAll: () => [], readyState: 'loading', addEventListener() {} },
     window: { scrollTo() {}, location: { assign: url => redirects.push(url) }, addEventListener(name, handler) { events[name] = handler; } },
     localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
-    location: { pathname: '/', origin: 'http://localhost' }, URL, AbortController, setTimeout, clearTimeout,
+    location: { pathname: '/', origin: 'http://localhost' }, URL, AbortController, setTimeout, clearTimeout, Uint8Array,
+    crypto: require('node:crypto').webcrypto,
+    btoa: value => Buffer.from(value, 'binary').toString('base64'),
     console: { warn: (...args) => notices.push(args.join(' ')) },
     fetch: () => { throw new Error('Unstubbed network call'); }
   });

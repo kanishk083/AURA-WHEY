@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const PRODUCTS = Object.freeze({
   'aura-whey-rich-chocolate-1-kg': { handle: 'aura-whey-rich-chocolate-1-kg', name: 'Rich Chocolate', idEnv: 'REVIEWS_RICH_CHOCOLATE_PRODUCT_ID' },
@@ -45,10 +45,20 @@ function fingerprint(value) {
   return createHmac('sha256', secret).update(value).digest('hex');
 }
 
+function keyedHash(value, name) {
+  const secret = process.env[name];
+  if (!secret || secret.length < 32) fail(503, 'Reviews are temporarily unavailable.');
+  return createHmac('sha256', secret).update(value).digest('hex');
+}
+
+export function ownerTokenHash(token) { return keyedHash(token, 'REVIEWS_OWNER_TOKEN_SECRET'); }
+export function visitorHash(visitorId) { return keyedHash(visitorId, 'REVIEWS_VISITOR_HASH_SECRET'); }
+export function ipHash(ip) { return fingerprint(ip); }
+
 async function antiSpam(ip, input) {
   const ipHash = fingerprint(ip);
   const duplicateHash = fingerprint(`${ipHash}\n${input.product.id}\n${input.displayName.toLowerCase()}\n${input.reviewText.toLowerCase()}`);
-  const result = await db('rpc/check_review_antispam', { method: 'POST', body: JSON.stringify({ p_ip_hash: ipHash, p_duplicate_hash: duplicateHash }) }, 'check_antispam');
+  const result = await reviewDb('rpc/check_review_antispam', { method: 'POST', body: JSON.stringify({ p_ip_hash: ipHash, p_duplicate_hash: duplicateHash }) }, 'check_antispam');
   const decision = Array.isArray(result) ? result[0] : result;
   if (!decision || decision.allowed !== true) fail(decision?.reason === 'rate_limited' ? 429 : decision?.reason === 'duplicate' ? 409 : 503, decision?.reason === 'rate_limited' ? 'Please wait before submitting another review.' : decision?.reason === 'duplicate' ? 'This review was already submitted recently.' : 'Reviews are temporarily unavailable.');
 }
@@ -56,14 +66,15 @@ async function antiSpam(ip, input) {
 function safeDiagnostic(value) {
   if (value == null) return null;
   let result = String(value);
-  for (const name of ['SUPABASE_SERVICE_ROLE_KEY', 'REVIEWS_IP_HASH_SECRET', 'SHOPIFY_ADMIN_CLIENT_SECRET', 'SHOPIFY_ADMIN_ACCESS_TOKEN']) {
+  for (const name of ['SUPABASE_SERVICE_ROLE_KEY', 'REVIEWS_IP_HASH_SECRET', 'REVIEWS_OWNER_TOKEN_SECRET', 'REVIEWS_VISITOR_HASH_SECRET', 'SHOPIFY_ADMIN_CLIENT_SECRET', 'SHOPIFY_ADMIN_ACCESS_TOKEN']) {
     const secret = process.env[name];
     if (secret) result = result.split(secret).join('[redacted]');
   }
+  result = result.replace(/\b[0-9a-f]{64}\b/gi, '[redacted-hash]');
   return result.slice(0, 500);
 }
 
-async function db(path, options = {}, operation = 'reviews_request') {
+export async function reviewDb(path, options = {}, operation = 'reviews_request') {
   const { url, key } = supabaseConfig();
   const authorization = /^eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(key) ? { Authorization: `Bearer ${key}` } : {};
   let response;
@@ -93,19 +104,23 @@ async function db(path, options = {}, operation = 'reviews_request') {
 export async function createReview(request) {
   const body = typeof request.body === 'string' ? JSON.parse(request.body) : request.body;
   const input = validateSubmission(body);
+  const ownerToken = randomBytes(32).toString('base64url');
+  const ownerTokenDigest = ownerTokenHash(ownerToken);
   const ip = String(request.headers['x-forwarded-for'] || request.socket?.remoteAddress || 'unknown').split(',')[0].trim();
   await antiSpam(ip, input);
-  const review = { id: randomUUID(), shopify_product_id: input.product.id, shopify_product_handle: input.product.handle, product_name: input.product.name, display_name: input.displayName, rating: input.rating, review_text: input.reviewText, created_at: new Date().toISOString() };
-  await db('reviews', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(review) }, 'create_review');
-  return publicReview(review);
+  const review = { id: randomUUID(), shopify_product_id: input.product.id, shopify_product_handle: input.product.handle, product_name: input.product.name, display_name: input.displayName, rating: input.rating, review_text: input.reviewText, created_at: new Date().toISOString(), owner_token_hash: ownerTokenDigest };
+  await reviewDb('reviews', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(review) }, 'create_review');
+  return { ...publicReview(review), ownerToken };
 }
 
-export function publicReview(review) { return { id: review.id, shopifyProductHandle: review.shopify_product_handle, productName: review.product_name, displayName: review.display_name, rating: review.rating, reviewText: review.review_text, createdAt: review.created_at }; }
+export function publicReview(review) { return { id: review.id, shopifyProductHandle: review.shopify_product_handle, productName: review.product_name, displayName: review.display_name, rating: review.rating, reviewText: review.review_text, createdAt: review.created_at, likeCount: Number(review.like_count || 0), liked: review.liked === true }; }
 
 export async function listReviews(request) {
   const params = new URL(request.url || '/', 'http://localhost').searchParams;
-  let path = 'reviews?select=id,shopify_product_handle,product_name,display_name,rating,review_text,created_at&order=created_at.desc&limit=' + LIMIT;
-  if (params.get('scope') === 'home') path += '&shopify_product_handle=in.(aura-whey-rich-chocolate-1-kg,aura-whey-mawa-kulfi-1-kg)';
-  else path += '&shopify_product_handle=eq.' + encodeURIComponent(productForHandle(params.get('product')).handle);
-  return (await db(path, {}, 'list_reviews')).map(publicReview);
+  const scope = params.get('scope') === 'home' ? 'home' : 'product';
+  const handle = scope === 'home' ? null : productForHandle(params.get('product')).handle;
+  const visitorId = String(request.headers?.['x-aura-review-visitor'] || '').trim();
+  const hashedVisitor = /^[A-Za-z0-9_-]{43}$/.test(visitorId) ? visitorHash(visitorId) : null;
+  const rows = await reviewDb('rpc/list_public_reviews', { method: 'POST', body: JSON.stringify({ p_product_handle: handle, p_scope: scope, p_visitor_hash: hashedVisitor, p_limit: LIMIT }) }, 'list_reviews');
+  return rows.map(publicReview);
 }

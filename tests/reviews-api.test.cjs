@@ -2,6 +2,8 @@ const { test, mock } = require('node:test');
 const assert = require('node:assert/strict');
 const mod = import('../api/_lib/reviews.js');
 process.env.SUPABASE_URL = 'https://fixture.supabase.co'; process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_fixture-service-role-key';
+process.env.REVIEWS_OWNER_TOKEN_SECRET = 'fixture-owner-token-secret-012345678901234567890';
+process.env.REVIEWS_VISITOR_HASH_SECRET = 'fixture-visitor-hash-secret-01234567890123456789';
 
 function response() { return { statusCode: 0, body: null, headers: {}, setHeader(k, v) { this.headers[k] = v; }, status(n) { this.statusCode = n; return this; }, json(v) { this.body = v; return this; } }; }
 function request(body, ip = '203.0.113.5') { return { body, headers: { 'x-forwarded-for': ip } }; }
@@ -44,13 +46,15 @@ test('Vercel relative review URLs reach the expected Supabase REST reads', async
   process.env.REVIEWS_RICH_CHOCOLATE_PRODUCT_ID = 'gid://shopify/Product/101';
   process.env.REVIEWS_MAWA_KULFI_PRODUCT_ID = 'gid://shopify/Product/102';
   const calls = [];
-  t.mock.method(global, 'fetch', async url => { calls.push(url); return { ok: true, status: 200, json: async () => [] }; });
+  t.mock.method(global, 'fetch', async (url, options) => { calls.push({ url, body: JSON.parse(options.body) }); return { ok: true, status: 200, json: async () => [] }; });
   await listReviews({ url: '/api/reviews?product=aura-whey-mawa-kulfi-1-kg' });
   await listReviews({ url: '/api/reviews?product=aura-whey-rich-chocolate-1-kg' });
   await listReviews({ url: '/api/reviews?scope=home' });
-  assert.match(calls[0], /shopify_product_handle=eq\.aura-whey-mawa-kulfi-1-kg/);
-  assert.match(calls[1], /shopify_product_handle=eq\.aura-whey-rich-chocolate-1-kg/);
-  assert.match(calls[2], /shopify_product_handle=in\.\(aura-whey-rich-chocolate-1-kg,aura-whey-mawa-kulfi-1-kg\)/);
+  assert.equal(calls.length, 3);
+  assert.match(calls[0].url, /\/rpc\/list_public_reviews$/);
+  assert.equal(calls[0].body.p_product_handle, 'aura-whey-mawa-kulfi-1-kg');
+  assert.equal(calls[1].body.p_product_handle, 'aura-whey-rich-chocolate-1-kg');
+  assert.equal(calls[2].body.p_scope, 'home');
 });
 
 test('a fully valid Mawa Kulfi request reaches the Supabase anti-spam RPC', async t => {
@@ -74,7 +78,7 @@ test('POST persists canonical product data and returns safe public review', asyn
   let saved;
   t.mock.method(global, 'fetch', async (url, options) => { if (url.includes('/rpc/')) return { ok: true, status: 200, json: async () => ({ allowed: true, reason: 'allowed' }) }; saved = JSON.parse(options.body); return { ok: true, status: 201, json: async () => null }; });
   const review = await createReview(request({ productHandle: 'aura-whey-rich-chocolate-1-kg', displayName: 'Rahul', rating: 5, reviewText: 'Really smooth and tastes great.' }));
-  assert.equal(saved.shopify_product_id, 'gid://shopify/Product/101'); assert.equal(saved.product_name, 'Rich Chocolate'); assert.equal(review.displayName, 'Rahul'); assert.equal(review.status, undefined); assert.equal(JSON.stringify(review).includes('<script>'), false);
+  assert.equal(saved.shopify_product_id, 'gid://shopify/Product/101'); assert.equal(saved.product_name, 'Rich Chocolate'); assert.match(saved.owner_token_hash, /^[0-9a-f]{64}$/); assert.equal(review.displayName, 'Rahul'); assert.match(review.ownerToken, /^[A-Za-z0-9_-]{43}$/); assert.notEqual(saved.owner_token_hash, review.ownerToken); assert.equal(review.status, undefined); assert.equal(JSON.stringify(review).includes('<script>'), false);
 });
 
 test('rate limiting and honeypot reject abusive submissions', async () => {
@@ -92,9 +96,9 @@ test('duplicate rapid submissions are rejected before persistence', async () => 
 
 test('GET filters by exact product handle or returns a mixed home feed', async t => {
   const { listReviews } = await mod;
-  const calls = []; t.mock.method(global, 'fetch', async (url) => { calls.push(url); return { ok: true, status: 200, json: async () => [{ id: '1', shopify_product_handle: 'aura-whey-rich-chocolate-1-kg', product_name: 'Rich Chocolate', display_name: 'R', rating: 4, review_text: 'Great taste.', created_at: 'now' }] }; });
-  const product = await listReviews({ url: 'https://example.test/api/reviews?product=aura-whey-rich-chocolate-1-kg' }); assert.equal(product[0].productName, 'Rich Chocolate'); assert.match(calls[0], /shopify_product_handle=eq/);
-  await listReviews({ url: 'https://example.test/api/reviews?scope=home' }); assert.match(calls[1], /in\.\(/);
+  const calls = []; t.mock.method(global, 'fetch', async (url, options) => { calls.push({ url, body: JSON.parse(options.body) }); return { ok: true, status: 200, json: async () => [{ id: '1', shopify_product_handle: 'aura-whey-rich-chocolate-1-kg', product_name: 'Rich Chocolate', display_name: 'R', rating: 4, review_text: 'Great taste.', created_at: 'now', like_count: 3, liked: true }] }; });
+  const product = await listReviews({ url: 'https://example.test/api/reviews?product=aura-whey-rich-chocolate-1-kg', headers: {} }); assert.equal(product[0].productName, 'Rich Chocolate'); assert.equal(product[0].likeCount, 3); assert.equal(product[0].liked, true); assert.equal(calls[0].body.p_product_handle, 'aura-whey-rich-chocolate-1-kg');
+  await listReviews({ url: 'https://example.test/api/reviews?scope=home', headers: {} }); assert.equal(calls[1].body.p_scope, 'home');
 });
 
 test('modern Supabase secret keys use apikey without a bearer authorization header', async t => {
