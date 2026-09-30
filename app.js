@@ -1070,8 +1070,8 @@ function playCartConfetti() {
     piece.className = `cart-confetti-piece${Math.random() > .22 ? '' : ' is-triangle'}`;
     piece.style.setProperty('--x', `${Math.random() * 100}%`);
     piece.style.setProperty('--drift', `${(Math.random() - .5) * 140}px`);
-    piece.style.setProperty('--delay', `${Math.random() * .55}s`);
-    piece.style.setProperty('--duration', `${2.4 + Math.random() * 1.2}s`);
+    piece.style.setProperty('--delay', `${Math.random() * .8}s`);
+    piece.style.setProperty('--duration', `${5.2 + Math.random() * 2.4}s`);
     piece.style.setProperty('--spin', `${(Math.random() - .5) * 900}deg`);
     piece.style.setProperty('--w', `${4 + Math.random() * 7}px`);
     piece.style.setProperty('--h', `${7 + Math.random() * 12}px`);
@@ -1082,7 +1082,7 @@ function playCartConfetti() {
   cartConfettiState.timer = setTimeout(() => {
     container.replaceChildren();
     cartConfettiState.timer = 0;
-  }, 4200);
+  }, 8500);
 }
 
 function setCartDrawer(open, focusClose = true) {
