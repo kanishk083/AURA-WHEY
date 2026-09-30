@@ -601,6 +601,11 @@ main { width: 100%; padding-top: calc(var(--banner-h) + var(--header-h)); overfl
 .review-card-actions { position: relative; z-index: 1; display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
 .review-like, .review-delete { border: 0; background: transparent; color: var(--soft); cursor: pointer; font: 700 .72rem/1.2 Montserrat, sans-serif; padding: .35rem .1rem; }
 .review-like { display: inline-flex; align-items: center; gap: .28rem; font-size: .82rem; }
+.review-like { position: relative; min-width: 2.7rem; }
+.review-like-animation { position: absolute; left: -.35rem; top: 50%; width: 2.4rem; height: 2.4rem; translate: 0 -50%; pointer-events: none; opacity: 0; }
+.review-like.is-animating .review-like-animation { opacity: 1; }
+.review-like.is-animating .review-like-symbol { opacity: 0; }
+.review-like-symbol { display: inline-block; transition: opacity .12s ease, transform .2s ease; }
 .review-like:hover, .review-like:focus-visible, .review-like.is-liked { color: #ef5350; }
 .review-like:disabled, .review-delete:disabled { cursor: wait; opacity: .55; }
 .review-delete { margin-left: auto; text-decoration: underline; text-underline-offset: .2em; }
