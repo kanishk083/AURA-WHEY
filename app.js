@@ -216,6 +216,7 @@ function variantPicker() {
 function acceptCart(cart) {
   commerce.cart = cart;
   state.cart = cart?.totalQuantity || 0;
+  if (!state.cart) resetCartConfetti();
   try {
     if (cart) localStorage.setItem(cartStorageKey, cart.id);
     else localStorage.removeItem(cartStorageKey);
@@ -511,6 +512,7 @@ function shell(content) {
       </header>
       <div class="overlay" data-action="close-menu"></div>
       <aside class="cart-drawer" id="cart-drawer" aria-label="Your cart" aria-hidden="true" inert>
+        <div class="cart-confetti" data-cart-confetti aria-hidden="true"></div>
         <div class="cart-drawer-head"><h2>Your cart</h2><button type="button" class="icon-button" data-action="close-cart" aria-label="Close cart">${icon('close')}</button></div>
         <div class="cart-drawer-body">${cart()}</div>
       </aside>
@@ -1050,6 +1052,27 @@ function showAuraBurst(control, text) {
   burst.addEventListener('animationend', () => burst.remove(), { once: true });
 }
 
+function resetCartConfetti() {
+  cartConfettiState.played = false;
+  cartConfettiState.animation?.destroy();
+  cartConfettiState.animation = null;
+  document.querySelector('[data-cart-confetti]')?.replaceChildren();
+}
+
+function playCartConfetti() {
+  if (cartConfettiState.played || !state.cart || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || !window.lottie) return;
+  const container = document.querySelector('[data-cart-confetti]');
+  if (!container) return;
+  cartConfettiState.played = true;
+  container.replaceChildren();
+  const animation = window.lottie.loadAnimation({ container, renderer: 'svg', loop: false, autoplay: true, path: 'assets/animations/cart-confetti.json' });
+  cartConfettiState.animation = animation;
+  animation.addEventListener('complete', () => {
+    animation.destroy();
+    if (cartConfettiState.animation === animation) cartConfettiState.animation = null;
+  }, { once: true });
+}
+
 function setCartDrawer(open, focusClose = true) {
   const drawer = document.querySelector('.cart-drawer');
   if (!drawer) return;
@@ -1060,6 +1083,7 @@ function setCartDrawer(open, focusClose = true) {
   document.querySelector('.overlay')?.classList.toggle('open', open);
   document.querySelector('.overlay')?.setAttribute('data-action', open ? 'close-cart' : 'close-menu');
   document.body.classList.toggle('cart-open', open);
+  if (open) playCartConfetti();
   if (open && focusClose) drawer.querySelector('[data-action="close-cart"]')?.focus();
 }
 
@@ -1416,6 +1440,7 @@ let purchaseBarObserver = null;
 let purchaseBarFallbackCleanup = null;
 let purchaseBarState = { visible: false };
 let cartDrawerState = { open: false };
+let cartConfettiState = { played: false, animation: null };
 
 let heroRequest = 0;
 let heroObserver;
