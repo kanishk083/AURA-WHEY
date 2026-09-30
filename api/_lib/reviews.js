@@ -4,6 +4,7 @@ import sharp from 'sharp';
 const PRODUCTS = Object.freeze({
   'aura-whey-rich-chocolate-1-kg': { handle: 'aura-whey-rich-chocolate-1-kg', name: 'Rich Chocolate', idEnv: 'REVIEWS_RICH_CHOCOLATE_PRODUCT_ID' },
   'aura-whey-mawa-kulfi-1-kg': { handle: 'aura-whey-mawa-kulfi-1-kg', name: 'Mawa Kulfi', idEnv: 'REVIEWS_MAWA_KULFI_PRODUCT_ID' },
+  'aura-whey-protein-sachets-35g': { handle: 'aura-whey-protein-sachets-35g', name: '35g Sachets', idEnv: 'REVIEWS_SACHETS_PRODUCT_ID' },
 });
 const LIMIT = 50;
 const IMAGE_BUCKET = 'review-images';
