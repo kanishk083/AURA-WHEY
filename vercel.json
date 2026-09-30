@@ -9,6 +9,7 @@
     { "source": "/shop", "destination": "/index.html" },
     { "source": "/shop/sachets", "destination": "/index.html" },
     { "source": "/shop/sachets/:path*", "destination": "/index.html" },
+    { "source": "/reviews", "destination": "/index.html" },
     { "source": "/cart", "destination": "/index.html" },
     { "source": "/checkout", "destination": "/index.html" },
     { "source": "/quality", "destination": "/index.html" },
