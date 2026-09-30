@@ -981,6 +981,10 @@ body.search-open { overflow: hidden; }
 .mobile-panel.open .mobile-shop-menu a { opacity: 1; transform: translateX(0); }
 .mobile-panel.open .mobile-shop-menu a:nth-child(2) { transition-delay: .24s; }
 .mobile-panel.open .mobile-shop-menu a:nth-child(3) { transition-delay: .29s; }
+/* Keep navigation content stable while the panel opens and Shop Products expands. */
+.mobile-panel nav a,
+.mobile-shop-menu summary,
+.mobile-panel .mobile-shop-menu a { opacity: 1; transform: none; transition: color .18s ease; }
 .mobile-theme { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 1rem; color: var(--soft); font: 700 .62rem/1 Montserrat, Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .mobile-theme .text-button { display: inline-grid; place-items: center; gap: .35rem; grid-auto-flow: column; min-height: 40px; padding: 0 .9rem; border: 1px solid var(--gold); border-radius: 999px; background: var(--gold); color: var(--ink); font: 800 .62rem/1 Montserrat, Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .mobile-theme .text-button:hover { background: var(--surface); color: var(--gold); }
