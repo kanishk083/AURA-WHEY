@@ -738,7 +738,7 @@ function reviewCard(review) {
   const photos = Array.isArray(review.imageUrls) ? review.imageUrls.slice(0, 3) : [];
   const gallery = photos.length ? `<div class="review-photo-grid">${photos.map((url, index) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" aria-label="Open review photo ${index + 1}"><img src="${escapeHtml(url)}" alt="Product photo shared by ${escapeHtml(name)}" loading="lazy" /></a>`).join('')}</div>` : '';
   const productLabel = reviewProductLabel() === '35g Sachets' ? '35g Sachets' : (review.productName || review.flavour || reviewProductLabel());
-  return `<article class="review-card" data-review-id="${escapeHtml(id)}"><div class="review-card-top"><span class="review-avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(productLabel)}</span></div></div><div class="review-stars" aria-label="${rating} out of 5 stars">${'\u2605'.repeat(rating)}<span aria-hidden="true">${'\u2606'.repeat(5 - rating)}</span></div><p class="review-copy">\u201c${escapeHtml(review.reviewText || review.text || '')}\u201d</p>${gallery}<div class="review-card-actions"><span class="review-badge">${escapeHtml(badge)}</span>${id ? `<button type="button" class="review-like${review.liked ? ' is-liked' : ''}" data-review-like aria-pressed="${review.liked ? 'true' : 'false'}"><span aria-hidden="true">${review.liked ? '\u2665' : '\u2661'}</span> <b>${Number(review.likeCount || 0)}</b></button>${owned ? '<button type="button" class="review-delete" data-review-delete>Delete review</button>' : ''}` : ''}</div></article>`;
+  return `<article class="review-card" data-review-id="${escapeHtml(id)}"><div class="review-card-top"><span class="review-avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(productLabel)}</span></div></div><div class="review-stars" aria-label="${rating} out of 5 stars">${'\u2605'.repeat(rating)}<span aria-hidden="true">${'\u2606'.repeat(5 - rating)}</span></div><p class="review-copy">\u201c${escapeHtml(review.reviewText || review.text || '')}\u201d</p>${gallery}<div class="review-card-actions"><span class="review-badge">${escapeHtml(badge)}</span>${id ? `<button type="button" class="review-like${review.liked ? ' is-liked' : ''}" data-review-like aria-pressed="${review.liked ? 'true' : 'false'}"><span class="review-like-animation" aria-hidden="true"></span><span class="review-like-symbol" aria-hidden="true">${review.liked ? '\u2665' : '\u2661'}</span> <b>${Number(review.likeCount || 0)}</b></button>${owned ? '<button type="button" class="review-delete" data-review-delete>Delete review</button>' : ''}` : ''}</div></article>`;
 }
 
 function approvedReviewCards(reviews = approvedReviews, scope = 'product') {
@@ -822,13 +822,23 @@ async function loadReviews(scope = 'product') {
 
 function updateReviewState(id, values) { for (const scope of ['home', 'product']) if (reviewData[scope]) reviewData[scope] = reviewData[scope].map(review => review.id === id ? { ...review, ...values } : review); }
 
+function playReviewLikeAnimation(button) {
+  if (!button || !window.lottie || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const container = button.querySelector('.review-like-animation'); if (!container) return;
+  button.classList.add('is-animating');
+  container.replaceChildren();
+  const animation = window.lottie.loadAnimation({ container, renderer: 'svg', loop: false, autoplay: true, path: 'assets/animations/review-like.json' });
+  animation.addEventListener('complete', () => { animation.destroy(); button.classList.remove('is-animating'); });
+}
+
 async function toggleReviewLike(button) {
   if (button.disabled) return;
   const id = button.closest('[data-review-id]')?.dataset.reviewId; if (!id) return;
   const wasLiked = button.getAttribute('aria-pressed') === 'true'; const count = Number(button.querySelector('b').textContent) || 0;
-  button.disabled = true; button.classList.toggle('is-liked', !wasLiked); button.setAttribute('aria-pressed', String(!wasLiked)); button.querySelector('span').textContent = wasLiked ? '\u2661' : '\u2665'; button.querySelector('b').textContent = String(Math.max(0, count + (wasLiked ? -1 : 1)));
-  try { const response = await fetch(`/api/reviews/${encodeURIComponent(id)}/like`, { method: wasLiked ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ visitorId: reviewVisitorId() }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.message || 'Unable to update this review.'); updateReviewState(id, payload); button.classList.toggle('is-liked', payload.liked); button.setAttribute('aria-pressed', String(payload.liked)); button.querySelector('span').textContent = payload.liked ? '\u2665' : '\u2661'; button.querySelector('b').textContent = String(payload.likeCount); }
-  catch (error) { button.classList.toggle('is-liked', wasLiked); button.setAttribute('aria-pressed', String(wasLiked)); button.querySelector('span').textContent = wasLiked ? '\u2665' : '\u2661'; button.querySelector('b').textContent = String(count); showToast(error.message); }
+  const symbol = button.querySelector('.review-like-symbol');
+  button.disabled = true; button.classList.toggle('is-liked', !wasLiked); button.setAttribute('aria-pressed', String(!wasLiked)); symbol.textContent = wasLiked ? '\u2661' : '\u2665'; button.querySelector('b').textContent = String(Math.max(0, count + (wasLiked ? -1 : 1)));
+  try { const response = await fetch(`/api/reviews/${encodeURIComponent(id)}/like`, { method: wasLiked ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ visitorId: reviewVisitorId() }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.message || 'Unable to update this review.'); updateReviewState(id, payload); button.classList.toggle('is-liked', payload.liked); button.setAttribute('aria-pressed', String(payload.liked)); symbol.textContent = payload.liked ? '\u2665' : '\u2661'; button.querySelector('b').textContent = String(payload.likeCount); if (payload.liked && !wasLiked) playReviewLikeAnimation(button); }
+  catch (error) { button.classList.toggle('is-liked', wasLiked); button.setAttribute('aria-pressed', String(wasLiked)); symbol.textContent = wasLiked ? '\u2665' : '\u2661'; button.querySelector('b').textContent = String(count); showToast(error.message); }
   finally { button.disabled = false; }
 }
 

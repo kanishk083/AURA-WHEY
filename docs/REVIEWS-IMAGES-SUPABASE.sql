@@ -18,7 +18,7 @@ as $$
     coalesce(bool_or(l.visitor_hash = p_visitor_hash), false)
   from public.reviews r
   left join public.review_likes l on l.review_id = r.id
-  where (p_scope = 'home' and r.shopify_product_handle in ('aura-whey-rich-chocolate-1-kg','aura-whey-mawa-kulfi-1-kg'))
+  where (p_scope = 'home' and r.shopify_product_handle in ('aura-whey-rich-chocolate-1-kg','aura-whey-mawa-kulfi-1-kg','aura-whey-protein-sachets-35g'))
      or (p_scope = 'product' and r.shopify_product_handle = p_product_handle)
   group by r.id
   order by r.created_at desc
