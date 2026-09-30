@@ -8,7 +8,7 @@ const PRODUCTS = Object.freeze({
 });
 const LIMIT = 50;
 const IMAGE_BUCKET = 'review-images';
-const MAX_IMAGES = 3;
+const MAX_IMAGES = 1;
 const MAX_IMAGE_SOURCE_BYTES = 900_000;
 const MAX_REQUEST_BYTES = 3_000_000;
 
@@ -36,7 +36,7 @@ export function validateSubmission(body) {
   if (displayName.length < 2 || displayName.length > 60 || !Number.isInteger(rating) || rating < 1 || rating > 5 || reviewText.length < 10 || reviewText.length > 1000 || /[<>]/.test(displayName + reviewText)) fail(422, 'Enter your name, a rating from 1 to 5, and a review of at least 10 characters.');
   if (body.website) fail(422, 'Unable to submit this review.');
   const images = body.images == null ? [] : body.images;
-  if (!Array.isArray(images) || images.length > MAX_IMAGES || images.some(image => typeof image !== 'string' || image.length > 1_250_000 || !/^data:image\/(?:jpeg|png|webp);base64,/.test(image))) fail(422, 'Add no more than 3 valid JPEG, PNG, or WebP product photos.');
+  if (!Array.isArray(images) || images.length > MAX_IMAGES || images.some(image => typeof image !== 'string' || image.length > 1_250_000 || !/^data:image\/(?:jpeg|png|webp);base64,/.test(image))) fail(422, 'Add one valid JPEG, PNG, or WebP product photo.');
   return { product, displayName, rating, reviewText, images };
 }
 

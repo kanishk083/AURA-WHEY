@@ -114,7 +114,7 @@ test('migration enforces uniqueness, cascading deletes, distributed limits and p
   assert.match(sql, /grant execute[\s\S]*to service_role/i);
   const imageSql = fs.readFileSync('docs/REVIEWS-IMAGES-SUPABASE.sql', 'utf8');
   assert.match(imageSql, /add column if not exists image_paths text\[\]/i);
-  assert.match(imageSql, /cardinality\(image_paths\) <= 3/i);
+  assert.match(imageSql, /cardinality\(image_paths\) <= 1/i);
   assert.match(imageSql, /'review-images'.*true.*800000/is);
   assert.match(imageSql, /list_public_reviews_with_images/i);
   assert.match(imageSql, /revoke all[\s\S]*from public, anon, authenticated/i);
