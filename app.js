@@ -1054,8 +1054,8 @@ function showAuraBurst(control, text) {
 
 function resetCartConfetti() {
   cartConfettiState.played = false;
-  if (cartConfettiState.frame) cancelAnimationFrame(cartConfettiState.frame);
-  cartConfettiState.frame = 0;
+  if (cartConfettiState.timer) clearTimeout(cartConfettiState.timer);
+  cartConfettiState.timer = 0;
   document.querySelector('[data-cart-confetti]')?.replaceChildren();
 }
 
@@ -1064,42 +1064,25 @@ function playCartConfetti() {
   const container = document.querySelector('[data-cart-confetti]');
   if (!container) return;
   cartConfettiState.played = true;
-  const canvas = document.createElement('canvas');
-  canvas.className = 'cart-confetti-canvas';
-  container.replaceChildren(canvas);
-  const context = canvas.getContext('2d');
   const colors = ['#ffcf33', '#f15b5b', '#48c6ef', '#8bd450', '#f58bd5', '#ffffff'];
-  const pieces = Array.from({ length: 110 }, () => ({
-    x: Math.random(), y: -Math.random() * .55, width: 4 + Math.random() * 7, height: 7 + Math.random() * 12,
-    speed: 90 + Math.random() * 145, drift: (Math.random() - .5) * 38, rotation: Math.random() * Math.PI,
-    spin: (Math.random() - .5) * 8, color: colors[Math.floor(Math.random() * colors.length)], shape: Math.random() > .22 ? 'rect' : 'triangle'
-  }));
-  const started = performance.now();
-  let previous = started;
-  const resize = () => { const ratio = window.devicePixelRatio || 1; const bounds = container.getBoundingClientRect(); canvas.width = Math.max(1, Math.round(bounds.width * ratio)); canvas.height = Math.max(1, Math.round(bounds.height * ratio)); canvas.style.width = `${bounds.width}px`; canvas.style.height = `${bounds.height}px`; context.setTransform(ratio, 0, 0, ratio, 0, 0); };
-  resize();
-  const draw = now => {
-    const elapsed = (now - started) / 1000;
-    const delta = (now - previous) / 1000;
-    previous = now;
-    const bounds = container.getBoundingClientRect();
-    context.clearRect(0, 0, bounds.width, bounds.height);
-    for (const piece of pieces) {
-      piece.y += piece.speed * delta;
-      piece.x += piece.drift * delta / Math.max(1, bounds.width);
-      piece.rotation += piece.spin * delta;
-      const x = piece.x * bounds.width;
-      const y = piece.y * bounds.height;
-      if (y < -30 || y > bounds.height + 30) continue;
-      context.save(); context.translate(x, y); context.rotate(piece.rotation); context.fillStyle = piece.color;
-      if (piece.shape === 'triangle') { context.beginPath(); context.moveTo(0, -piece.height / 2); context.lineTo(piece.width / 2, piece.height / 2); context.lineTo(-piece.width / 2, piece.height / 2); context.closePath(); context.fill(); }
-      else context.fillRect(-piece.width / 2, -piece.height / 2, piece.width, piece.height);
-      context.restore();
-    }
-    if (now - started < 3200) cartConfettiState.frame = requestAnimationFrame(draw);
-    else { context.clearRect(0, 0, bounds.width, bounds.height); cartConfettiState.frame = 0; }
-  };
-  cartConfettiState.frame = requestAnimationFrame(draw);
+  const pieces = Array.from({ length: 90 }, () => {
+    const piece = document.createElement('i');
+    piece.className = `cart-confetti-piece${Math.random() > .22 ? '' : ' is-triangle'}`;
+    piece.style.setProperty('--x', `${Math.random() * 100}%`);
+    piece.style.setProperty('--drift', `${(Math.random() - .5) * 22}%`);
+    piece.style.setProperty('--delay', `${Math.random() * .55}s`);
+    piece.style.setProperty('--duration', `${2.4 + Math.random() * 1.2}s`);
+    piece.style.setProperty('--spin', `${(Math.random() - .5) * 900}deg`);
+    piece.style.setProperty('--w', `${4 + Math.random() * 7}px`);
+    piece.style.setProperty('--h', `${7 + Math.random() * 12}px`);
+    piece.style.setProperty('--color', colors[Math.floor(Math.random() * colors.length)]);
+    return piece;
+  });
+  container.replaceChildren(...pieces);
+  cartConfettiState.timer = setTimeout(() => {
+    container.replaceChildren();
+    cartConfettiState.timer = 0;
+  }, 4200);
 }
 
 function setCartDrawer(open, focusClose = true) {
@@ -1469,7 +1452,7 @@ let purchaseBarObserver = null;
 let purchaseBarFallbackCleanup = null;
 let purchaseBarState = { visible: false };
 let cartDrawerState = { open: false };
-let cartConfettiState = { played: false, frame: 0 };
+let cartConfettiState = { played: false, timer: 0 };
 
 let heroRequest = 0;
 let heroObserver;
