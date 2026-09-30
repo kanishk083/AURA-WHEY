@@ -1555,3 +1555,10 @@ html[data-theme="light"] .product-page .button.primary:hover, html[data-theme="l
 .track-cancel-dialog .field { margin-bottom: 1rem; }
 .track-cancel-dialog select { width: 100%; min-height: 44px; font-size: 1rem; }
 .track-cancel-dialog [data-cancel-status]:not(:empty) { margin: 0 0 1rem; color: var(--muted); }
+
+@media (max-width: 860px) {
+  .review-layout { width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr); gap: 2rem; }
+  .review-layout > div:first-child, .review-layout > .form { width: 100%; min-width: 0; box-sizing: border-box; }
+  .review-layout > div:first-child::after { margin-top: 2rem; }
+  .review-layout > .form { overflow: hidden; }
+}
