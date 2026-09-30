@@ -795,7 +795,7 @@ function reviewsPage() {
 function productReviews() {
   const labels = ['Poor', 'Fair', 'Good', 'Great', 'Superb'];
   const star = `<svg viewBox="0 0 24 24" width="36" height="36" focusable="false"><path fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round" d="M12 3 14.8 8.7 21 9.6 16.5 14 17.6 20.2 12 17.3 6.4 20.2 7.5 14 3 9.6 9.2 8.7Z"/></svg>`;
-  const rating = `<fieldset class="review-rating peek-rating"><legend>Your rating</legend><div class="peek-rating-stars" role="radiogroup" aria-label="Your rating"><span class="peek-rating-tip" aria-live="polite">Good</span>${[1, 2, 3, 4, 5].map(n => `<label data-rating="${n}"><input class="peek-rating-input" type="radio" name="rating" value="${n}"${n === 3 ? ' checked' : ''} required /><span aria-hidden="true">${star}</span><span class="peek-rating-name" aria-hidden="true">${labels[n - 1]}</span><span class="sr-only">${n} \u2014 ${labels[n - 1]}</span></label>`).join('')}</div></fieldset>`;
+  const rating = `<fieldset class="review-rating peek-rating"><legend>Your rating</legend><div class="peek-rating-stars" role="radiogroup" aria-label="Your rating"><span class="peek-rating-tip" aria-live="polite">Choose a rating</span>${[1, 2, 3, 4, 5].map(n => `<label data-rating="${n}"><input class="peek-rating-input" type="radio" name="rating" value="${n}" required /><span aria-hidden="true">${star}</span><span class="sr-only">${n} \u2014 ${labels[n - 1]}</span></label>`).join('')}</div></fieldset>`;
   return `${reviewShowcase('product', reviewData.product || approvedReviews)}<section class="section review-contribute-section"><div class="section-inner"><div class="review-contribute"><div class="review-layout"><div><p class="hero-overline">Your turn</p><h3>Share your Aura.</h3><p>How did it taste? How did it mix? Tell us what made it part of your routine.</p><p class="small">Your review is published immediately after a quick safety check.</p></div><form class="form" data-form="review"><label class="field">Your name<input name="reviewName" maxlength="60" required autocomplete="given-name" /></label><label class="field" aria-hidden="true" style="position:absolute;left:-9999px">Website<input name="website" tabindex="-1" autocomplete="off" /></label>${rating}<label class="field">Your review<textarea name="reviewText" rows="4" minlength="10" maxlength="1000" required placeholder="Tell us about the flavour and your experience"></textarea></label><label class="field review-image-field">Product photo <span class="small">Optional · 1 image, automatically compressed</span><input type="file" name="reviewImages" accept="image/jpeg,image/png,image/webp" /></label><div class="review-image-preview" data-review-image-preview aria-live="polite"></div><button type="submit" class="button primary">Submit review</button><div id="review-result" role="status" aria-live="polite"></div></form></div></div></div></section>`;
 }
 
@@ -1790,32 +1790,35 @@ function bindEvents() {
     updatePeekRating(group, selected);
     group.querySelectorAll('input').forEach(input => {
       const item = input.closest('label');
-      item.addEventListener('pointerenter', event => {
-        if (event.pointerType !== 'touch') updatePeekRating(group, Number(input.value));
-      });
-      input.addEventListener('focus', () => updatePeekRating(group, Number(input.value)));
+      item.addEventListener('pointerenter', () => updatePeekRating(group, Number(input.value), true));
+      input.addEventListener('focus', () => updatePeekRating(group, Number(input.value), true));
       input.addEventListener('click', () => {
         selected = selected === Number(input.value) ? 0 : Number(input.value);
         group.querySelectorAll('input').forEach(radio => { radio.checked = Number(radio.value) === selected; });
-        updatePeekRating(group, selected);
+        updatePeekRating(group, selected, true);
         const star = item.querySelector('[aria-hidden]');
         if (selected && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
           star.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 320 });
         }
       });
     });
-    group.addEventListener('pointerleave', () => updatePeekRating(group, selected));
+    group.addEventListener('pointermove', event => {
+      const item = event.target.closest?.('label[data-rating]');
+      if (item) updatePeekRating(group, Number(item.dataset.rating), true);
+    });
+    group.addEventListener('pointerleave', () => updatePeekRating(group, selected, false));
     group.addEventListener('focusout', event => {
-      if (!group.contains(event.relatedTarget)) updatePeekRating(group, selected);
+      if (!group.contains(event.relatedTarget)) updatePeekRating(group, selected, false);
     });
   });
 }
 
-function updatePeekRating(group, value) {
+function updatePeekRating(group, value, reveal = false) {
   if (!group) return;
   const labels = ['Poor', 'Fair', 'Good', 'Great', 'Superb'];
   const tip = group.querySelector('.peek-rating-tip');
   if (tip) tip.textContent = value ? labels[value - 1] : 'Choose a rating';
+  group.classList.toggle('is-previewing', reveal);
   group.querySelectorAll('[data-rating]').forEach(item => {
     item.classList.toggle('is-previewed', Number(item.dataset.rating) <= value);
     item.classList.toggle('is-current', Number(item.dataset.rating) === value);
