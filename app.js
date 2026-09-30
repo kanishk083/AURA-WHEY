@@ -1069,7 +1069,7 @@ function playCartConfetti() {
     const piece = document.createElement('i');
     piece.className = `cart-confetti-piece${Math.random() > .22 ? '' : ' is-triangle'}`;
     piece.style.setProperty('--x', `${Math.random() * 100}%`);
-    piece.style.setProperty('--drift', `${(Math.random() - .5) * 22}%`);
+    piece.style.setProperty('--drift', `${(Math.random() - .5) * 140}px`);
     piece.style.setProperty('--delay', `${Math.random() * .55}s`);
     piece.style.setProperty('--duration', `${2.4 + Math.random() * 1.2}s`);
     piece.style.setProperty('--spin', `${(Math.random() - .5) * 900}deg`);
