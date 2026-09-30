@@ -698,7 +698,11 @@ main { width: 100%; padding-top: calc(var(--banner-h) + var(--header-h)); overfl
 .peek-rating-stars > .peek-rating-tip { top: 0; left: 0; translate: 0; padding: .3rem .55rem; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-low); color: var(--gold); font: 700 .6rem/1.2 Montserrat, Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .review-image-field { gap: .5rem; }
 .review-image-field .small { color: var(--muted); font-size: .62rem; letter-spacing: .06em; }
-.review-image-field input[type="file"] { min-height: 3rem; padding: .75rem; border-style: dashed; cursor: pointer; }
+.review-image-field input[type="file"] { box-sizing: border-box; min-height: 3.25rem; padding: .55rem .65rem; border: 1px dashed color-mix(in srgb, var(--gold) 48%, var(--line)); border-radius: 7px; background: color-mix(in srgb, var(--surface-low) 88%, transparent); color: var(--muted); cursor: pointer; font: 600 .72rem/1.2 "Plus Jakarta Sans", Arial, sans-serif; transition: border-color .2s ease, background .2s ease, box-shadow .2s ease; }
+.review-image-field input[type="file"]::file-selector-button { margin-right: .7rem; padding: .62rem .85rem; border: 1px solid color-mix(in srgb, var(--gold) 70%, var(--line)); border-radius: 4px; background: var(--gold); color: #17130a; cursor: pointer; font: 800 .62rem/1 Montserrat, Arial, sans-serif; letter-spacing: .06em; text-transform: uppercase; transition: background .2s ease, box-shadow .2s ease, transform .2s ease; }
+.review-image-field input[type="file"]:hover { border-color: var(--gold); background: color-mix(in srgb, var(--surface) 92%, transparent); }
+.review-image-field input[type="file"]:hover::file-selector-button, .review-image-field input[type="file"]:focus-visible::file-selector-button { background: var(--text); color: var(--bg); box-shadow: 0 7px 18px -12px var(--gold); transform: translateY(-1px); }
+.review-image-field input[type="file"]:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .review-image-preview img { width: 4rem; height: 4rem; border-radius: 6px; transition: transform .2s ease; }
 .review-image-preview img:hover { transform: translateY(-3px) rotate(-2deg); }
 .review-layout > .form > .button.primary { width: 100%; min-height: 3.25rem; margin-top: .25rem; border-radius: 6px; font-size: .68rem; box-shadow: 0 14px 28px -18px rgba(251,191,36,.9); }
