@@ -652,7 +652,7 @@ main { width: 100%; padding-top: calc(var(--banner-h) + var(--header-h)); overfl
 .peek-rating-stars > label > span[aria-hidden]:not(.peek-rating-name) { padding: 0; border: 0; border-radius: 0; background: transparent; color: #52525b; font: 32px/1 Arial, sans-serif; transition: color .16s ease, translate .32s ease, scale .32s ease; }
 .peek-rating-stars > label.is-previewed > span[aria-hidden]:not(.peek-rating-name) { color: #f5b400; }
 .peek-rating-stars > label > span[aria-hidden]:not(.peek-rating-name) svg { display: block; width: 36px; height: 36px; }
-.peek-rating-name { display: none; }
+.review-rating .peek-rating-name { display: none; padding: 0; border: 0; border-radius: 0; background: transparent; }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .peek-rating-stars > label:hover > span[aria-hidden] { translate: 0 -7px; scale: 1.15; }
 }
@@ -667,7 +667,7 @@ main { width: 100%; padding-top: calc(var(--banner-h) + var(--header-h)); overfl
 .review-preview-footer { position: relative; z-index: 1; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
 @media (max-width: 900px) { .review-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .review-card-grid, .review-layout { grid-template-columns: minmax(0, 1fr); } .review-heading-row { align-items: flex-start; } .review-empty { align-items: flex-start; } .review-card { min-height: 14rem; } .review-showcase-product .review-card { flex-basis: min(78vw, 17rem); min-height: 11.5rem; } }
-@media (max-width: 640px) { .peek-rating-stars > label { height: 4rem; align-content: start; gap: .25rem; } .peek-rating-name { display: block; color: var(--muted); font: 700 .48rem/1 Montserrat, Arial, sans-serif; letter-spacing: .04em; text-transform: uppercase; } .peek-rating-stars > label.is-current .peek-rating-name { color: var(--gold); } }
+@media (max-width: 640px) { .peek-rating-stars > label { height: 4rem; align-content: start; gap: .25rem; } .review-rating .peek-rating-name { display: block; padding: 0; border: 0; color: var(--muted); font: 700 .48rem/1 Montserrat, Arial, sans-serif; letter-spacing: .04em; text-transform: uppercase; } .peek-rating-stars > label.is-current .peek-rating-name { color: var(--gold); } }
 
 /* Review contribution form: a focused, premium interaction surface. */
 .review-contribute-section { position: relative; overflow: hidden; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--bg); }
