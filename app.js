@@ -417,7 +417,8 @@ async function changeCartLine(action, id) {
       else state.auraDownStreak += 1;
       const reward = action === 'line-up' ? `+${updated.quantity * 1000} AURA` : `\u2212${state.auraDownStreak * 1000} AURA`;
       const sachetControl = document.querySelector(`.sachet-cart-qty [data-line-id="${CSS.escape(id)}"]`)?.closest('.sachet-cart-qty');
-      if (sachetControl) showAuraBurst(sachetControl, reward);
+      const cartControl = sachetControl || document.querySelector(`.cart-item[data-line-id="${CSS.escape(id)}"] .cart-item-controls`);
+      if (cartControl) showAuraBurst(cartControl, reward);
       else showToast(reward);
     });
 }
