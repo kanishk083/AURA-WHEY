@@ -720,6 +720,14 @@ function previewReviewImages(input) {
   preview.replaceChildren(...files.map(file => { const img = document.createElement('img'); const url = URL.createObjectURL(file); img.src = url; img.alt = ''; img.onload = () => URL.revokeObjectURL(url); return img; }));
 }
 
+function reviewProductHandle() {
+  return shopSection() === 'sachets' ? SHOPIFY_CONFIG.products.Sachets : SHOPIFY_CONFIG.products[state.flavour];
+}
+
+function reviewProductLabel() {
+  return shopSection() === 'sachets' ? '35g Sachets' : state.flavour;
+}
+
 function reviewCard(review) {
   const rating = Math.max(1, Math.min(5, Number(review.rating) || 1));
   const name = String(review.displayName || review.name || 'Aura Whey customer').trim();
@@ -729,27 +737,28 @@ function reviewCard(review) {
   const owned = Boolean(id && reviewOwners()[id]);
   const photos = Array.isArray(review.imageUrls) ? review.imageUrls.slice(0, 3) : [];
   const gallery = photos.length ? `<div class="review-photo-grid">${photos.map((url, index) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" aria-label="Open review photo ${index + 1}"><img src="${escapeHtml(url)}" alt="Product photo shared by ${escapeHtml(name)}" loading="lazy" /></a>`).join('')}</div>` : '';
-  return `<article class="review-card" data-review-id="${escapeHtml(id)}"><div class="review-card-top"><span class="review-avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(review.productName || review.flavour || state.flavour)}</span></div></div><div class="review-stars" aria-label="${rating} out of 5 stars">${'\u2605'.repeat(rating)}<span aria-hidden="true">${'\u2606'.repeat(5 - rating)}</span></div><p class="review-copy">\u201c${escapeHtml(review.reviewText || review.text || '')}\u201d</p>${gallery}<div class="review-card-actions"><span class="review-badge">${escapeHtml(badge)}</span>${id ? `<button type="button" class="review-like${review.liked ? ' is-liked' : ''}" data-review-like aria-pressed="${review.liked ? 'true' : 'false'}"><span aria-hidden="true">${review.liked ? '\u2665' : '\u2661'}</span> <b>${Number(review.likeCount || 0)}</b></button>${owned ? '<button type="button" class="review-delete" data-review-delete>Delete review</button>' : ''}` : ''}</div></article>`;
+  const productLabel = reviewProductLabel() === '35g Sachets' ? '35g Sachets' : (review.productName || review.flavour || reviewProductLabel());
+  return `<article class="review-card" data-review-id="${escapeHtml(id)}"><div class="review-card-top"><span class="review-avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(productLabel)}</span></div></div><div class="review-stars" aria-label="${rating} out of 5 stars">${'\u2605'.repeat(rating)}<span aria-hidden="true">${'\u2606'.repeat(5 - rating)}</span></div><p class="review-copy">\u201c${escapeHtml(review.reviewText || review.text || '')}\u201d</p>${gallery}<div class="review-card-actions"><span class="review-badge">${escapeHtml(badge)}</span>${id ? `<button type="button" class="review-like${review.liked ? ' is-liked' : ''}" data-review-like aria-pressed="${review.liked ? 'true' : 'false'}"><span aria-hidden="true">${review.liked ? '\u2665' : '\u2661'}</span> <b>${Number(review.likeCount || 0)}</b></button>${owned ? '<button type="button" class="review-delete" data-review-delete>Delete review</button>' : ''}` : ''}</div></article>`;
 }
 
 function approvedReviewCards(reviews = approvedReviews, scope = 'product') {
-  const visible = reviews.filter(review => review && review.approved !== false && (scope === 'home' || review.shopifyProductHandle === SHOPIFY_CONFIG.products[state.flavour]));
+  const visible = reviews.filter(review => review && review.approved !== false && (scope === 'home' || review.shopifyProductHandle === reviewProductHandle()));
   if (!visible.length) {
-    const subject = scope === 'home' ? 'Mawa Kulfi and Rich Chocolate' : state.flavour;
+    const subject = scope === 'home' ? 'Mawa Kulfi and Rich Chocolate' : reviewProductLabel();
     return `<div class="review-empty"><span aria-hidden="true">\u2606</span><div><h3>Community stories are warming up.</h3><p>Approved customer reviews for ${escapeHtml(subject)} will appear here.</p></div></div>`;
   }
   const className = scope === 'product' ? 'review-card-track' : 'review-card-grid';
-  const label = scope === 'product' ? `Customer reviews for ${state.flavour}` : 'Customer reviews for all Aura Whey flavours';
+  const label = scope === 'product' ? `Customer reviews for ${reviewProductLabel()}` : 'Customer reviews for all Aura Whey flavours';
   return `<div class="${className}" aria-label="${escapeHtml(label)}">${visible.map(reviewCard).join('')}</div>`;
 }
 
 function reviewShowcase(scope = 'home', reviews = approvedReviews) {
   const isProduct = scope === 'product';
   const titleId = isProduct ? 'product-customer-reviews-title' : 'home-customer-reviews-title';
-  const hasVisibleReviews = reviews.some(review => review?.approved === true && (!isProduct || !review.flavour || review.flavour === state.flavour));
+  const hasVisibleReviews = reviews.some(review => review?.approved === true && (!isProduct || review.shopifyProductHandle === reviewProductHandle()));
   const controls = isProduct && hasVisibleReviews ? `<div class="review-carousel-controls" aria-label="Review carousel controls"><button type="button" class="button" data-action="reviews-prev" aria-label="Previous review">${icon('arrowLeft')}</button><button type="button" class="button" data-action="reviews-next" aria-label="Next review">${icon('arrowRight')}</button></div>` : '';
   const supportingCopy = isProduct
-    ? `What ${escapeHtml(state.flavour)} customers say \u2014 people who take their training seriously and still believe a great shake should make them smile.`
+    ? `What ${escapeHtml(reviewProductLabel())} customers say \u2014 people who take their training seriously and still believe a great shake should make them smile.`
     : 'A collection of love for Mawa Kulfi and Rich Chocolate from people who take their fitness and wellbeing seriously.';
   return `<section class="section product-reviews review-showcase-${scope}" data-review-scope="${scope}" aria-labelledby="${titleId}"><div class="section-inner"><div class="review-heading-row"><header class="review-love-header"><p class="hero-overline">Love from the routine</p><h2 id="${titleId}">Strong routines. Big love.</h2><p>${supportingCopy}</p></header>${controls}</div><div class="review-board">${approvedReviewCards(reviews, scope)}${isProduct ? '<article id="review-preview" class="review-card review-preview" hidden></article>' : ''}</div></div></section>`;
 }
@@ -796,7 +805,7 @@ function showSavedReview() {
 }
 
 async function loadReviews(scope = 'product') {
-  const url = scope === 'home' ? '/api/reviews?scope=home' : '/api/reviews?product=' + encodeURIComponent(SHOPIFY_CONFIG.products[state.flavour]);
+  const url = scope === 'home' ? '/api/reviews?scope=home' : '/api/reviews?product=' + encodeURIComponent(reviewProductHandle());
   const section = document.querySelector(`[data-review-scope="${scope}"]`);
   if (section) section.querySelector('.review-board').innerHTML = '<p class="review-loading" role="status">Loading reviews...</p>';
   try {
@@ -1935,7 +1944,7 @@ async function handleForm(event) {
       if (files.length) result.textContent = 'Preparing and compressing your photos...';
       const images = await Promise.all(files.map(compressReviewImage));
       result.textContent = 'Publishing your review...';
-      const response = await fetch('/api/reviews', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ productHandle: SHOPIFY_CONFIG.products[state.flavour], displayName: name, rating, reviewText: text, website: form.elements.website.value, images }) });
+      const response = await fetch('/api/reviews', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ productHandle: reviewProductHandle(), displayName: name, rating, reviewText: text, website: form.elements.website.value, images }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Unable to publish your review.');
       result.textContent = 'Thanks — your review is now live.';
