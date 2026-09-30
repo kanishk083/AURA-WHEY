@@ -1060,9 +1060,14 @@ body.search-open { overflow: hidden; }
 .applied-coupon-state { color: var(--muted); font-size: .72rem; }
 .applied-coupon-remove, .pincode-change { min-height: 32px; padding: .25rem 0; border: 0; background: transparent; color: var(--gold); font: 800 .68rem/1 Montserrat, Arial, sans-serif; letter-spacing: .04em; text-decoration: underline; text-underline-offset: .2rem; }
 .applied-coupon-remove:hover, .pincode-change:hover { color: var(--text); }
-.pincode-saved { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .35rem .75rem; align-items: center; padding-top: .25rem; }
-.pincode-saved .delivery-result { grid-column: 1 / -1; margin: .15rem 0 .1rem; }
-.pincode-change { grid-column: 1 / -1; justify-self: start; }
+.pincode-saved { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .15rem .7rem; align-items: center; padding: .7rem .75rem; border: 1px solid var(--line); border-radius: 5px; background: color-mix(in srgb, var(--surface) 72%, var(--bg)); }
+.pincode-mark { width: 1.8rem; height: 1.8rem; display: grid; place-items: center; border: 1px solid color-mix(in srgb, var(--gold) 70%, transparent); border-radius: 50%; color: var(--gold); }
+.pincode-mark .icon { width: .9rem; height: .9rem; }
+.pincode-details { display: grid; gap: .2rem; }
+.pincode-caption { color: var(--muted); font: 700 .58rem/1 Montserrat, Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.pincode-value { color: var(--text); font-size: 1rem; letter-spacing: .02em; }
+.pincode-saved .delivery-result { grid-column: 2 / -1; margin: .35rem 0 .05rem; font-size: .74rem; }
+.pincode-change { grid-column: 3; grid-row: 1; min-height: 30px; padding: .45rem .65rem; border: 1px solid color-mix(in srgb, var(--gold) 62%, transparent); border-radius: 4px; text-decoration: none; }
 .summary-payments-card { text-align: center; }
 /* Rebuilt Order summary: stacked blocks with dividers, per the supplied design. */
 .summary-block { padding: 1rem 0; border-bottom: 1px solid var(--line); }
