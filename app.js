@@ -301,7 +301,7 @@ function cartLineIdentity(variant) {
 function appliedCoupons() {
   const codes = commerce.cart?.discountCodes || [];
   if (!codes.length) return '';
-  return codes.map(code => `<div class="applied-coupon"><span class="coupon-party" aria-hidden="true">\u{1F389}\u{1F38A}</span><span class="applied-coupon-code">${escapeHtml(code.code)}</span><span class="applied-coupon-state">${code.applicable ? 'Applied' : 'Not applicable'}</span><button type="button" class="applied-coupon-remove" data-action="remove-coupon" data-code="${escapeHtml(code.code)}" aria-label="Remove coupon ${escapeHtml(code.code)}" ${commerce.busy ? 'disabled' : ''}>Remove</button></div>`).join('');
+  return codes.map(code => `<div class="applied-coupon"><span class="coupon-party" aria-hidden="true">✓</span><span class="applied-coupon-details"><span class="applied-coupon-code">${escapeHtml(code.code)}</span><span class="applied-coupon-state">${code.applicable ? 'Applied' : 'Not applicable'}</span></span><button type="button" class="applied-coupon-remove" data-action="remove-coupon" data-code="${escapeHtml(code.code)}" aria-label="Remove coupon ${escapeHtml(code.code)}" ${commerce.busy ? 'disabled' : ''}>Remove</button></div>`).join('');
 }
 
 function deliveryPincodeCard() {

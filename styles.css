@@ -1053,12 +1053,16 @@ body.search-open { overflow: hidden; }
 .cart-drawer .summary-card:last-of-type { border-bottom: 0; }
 .summary > p { padding-inline: 1rem; }
 .summary > p .button { width: 100%; }
-.applied-coupon { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .8rem; padding: .7rem; border: 1px dashed var(--gold); border-radius: 6px; }
-.applied-coupon-code, .pincode-value { font-weight: 700; }
-.coupon-party { font-size: 1rem; line-height: 1; }
-.applied-coupon-state { font-size: .75rem; color: var(--muted); }
-.applied-coupon-remove, .pincode-change { min-height: 44px; padding: .4rem; border: 0; background: transparent; color: var(--gold); text-decoration: underline; font-weight: 700; }
-.applied-coupon-remove { margin-left: auto; }
+.applied-coupon { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .7rem; margin-top: .9rem; padding: .75rem .8rem; border: 1px solid var(--line); border-left: 2px solid var(--gold); border-radius: 5px; background: color-mix(in srgb, var(--surface) 72%, var(--bg)); }
+.applied-coupon-code, .pincode-value { font-weight: 800; }
+.coupon-party { width: 1.65rem; height: 1.65rem; display: grid; place-items: center; border: 1px solid color-mix(in srgb, var(--gold) 70%, transparent); border-radius: 50%; color: var(--gold); font: 800 .72rem/1 Montserrat, Arial, sans-serif; }
+.applied-coupon-details { display: inline-flex; align-items: baseline; gap: .55rem; min-width: 0; }
+.applied-coupon-state { color: var(--muted); font-size: .72rem; }
+.applied-coupon-remove, .pincode-change { min-height: 32px; padding: .25rem 0; border: 0; background: transparent; color: var(--gold); font: 800 .68rem/1 Montserrat, Arial, sans-serif; letter-spacing: .04em; text-decoration: underline; text-underline-offset: .2rem; }
+.applied-coupon-remove:hover, .pincode-change:hover { color: var(--text); }
+.pincode-saved { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .35rem .75rem; align-items: center; padding-top: .25rem; }
+.pincode-saved .delivery-result { grid-column: 1 / -1; margin: .15rem 0 .1rem; }
+.pincode-change { grid-column: 1 / -1; justify-self: start; }
 .summary-payments-card { text-align: center; }
 /* Rebuilt Order summary: stacked blocks with dividers, per the supplied design. */
 .summary-block { padding: 1rem 0; border-bottom: 1px solid var(--line); }
