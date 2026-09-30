@@ -702,21 +702,32 @@ function reviewVisitorId() {
 function blobDataUrl(blob) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('Unable to prepare this photo.')); reader.readAsDataURL(blob); }); }
 
 async function compressReviewImage(file) {
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 15_000_000) throw new Error('Choose JPEG, PNG, or WebP photos under 15 MB.');
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 50_000_000) throw new Error('Choose one JPEG, PNG, or WebP photo under 50 MB.');
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
-  const encode = quality => new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
-  let output = await encode(.82); if (output?.size > 650_000) output = await encode(.68);
-  if (!output || output.size > 900_000) throw new Error('One photo is too detailed to compress. Try a smaller image.');
-  return blobDataUrl(output);
+  const longestSide = Math.max(bitmap.width, bitmap.height);
+  const canvas = document.createElement('canvas');
+  const encode = (maxSide, quality) => new Promise((resolve, reject) => {
+    const scale = Math.min(1, maxSide / longestSide);
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Unable to prepare this photo.')), 'image/webp', quality);
+  });
+  try {
+    for (const [maxSide, quality] of [[2000, .84], [1800, .78], [1600, .72], [1400, .66], [1200, .6]]) {
+      const output = await encode(maxSide, quality);
+      if (output.size <= 850_000) return blobDataUrl(output);
+    }
+  } finally { bitmap.close(); }
+  throw new Error('This photo could not be compressed. Please try another image.');
 }
 
 function previewReviewImages(input) {
   const preview = input.form?.querySelector('[data-review-image-preview]'); if (!preview) return;
   const files = Array.from(input.files || []);
-  if (files.length > 3) { input.value = ''; preview.textContent = 'Choose no more than 3 photos.'; return; }
+  if (files.length > 1) { input.value = ''; preview.textContent = 'Choose one photo.'; return; }
   preview.replaceChildren(...files.map(file => { const img = document.createElement('img'); const url = URL.createObjectURL(file); img.src = url; img.alt = ''; img.onload = () => URL.revokeObjectURL(url); return img; }));
 }
 
@@ -742,7 +753,7 @@ function reviewCard(review, options = {}) {
   const badge = review.verified ? 'Verified purchase' : 'Customer review';
   const id = String(review.id || '');
   const owned = Boolean(id && reviewOwners()[id]);
-  const photos = Array.isArray(review.imageUrls) ? review.imageUrls.slice(0, 3) : [];
+  const photos = Array.isArray(review.imageUrls) ? review.imageUrls.slice(0, 1) : [];
   const gallery = photos.length ? `<div class="review-photo-grid">${photos.map((url, index) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" aria-label="Open review photo ${index + 1}"><img src="${escapeHtml(url)}" alt="Product photo shared by ${escapeHtml(name)}" loading="lazy" /></a>`).join('')}</div>` : '';
   const productLabel = reviewProductLabel() === '35g Sachets' ? '35g Sachets' : (review.productName || review.flavour || reviewProductLabel());
   const date = options.showDate ? formatReviewDate(review.createdAt) : '';
@@ -785,7 +796,7 @@ function productReviews() {
   const labels = ['Poor', 'Fair', 'Good', 'Great', 'Superb'];
   const star = `<svg viewBox="0 0 24 24" width="36" height="36" focusable="false"><path fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round" d="M12 3 14.8 8.7 21 9.6 16.5 14 17.6 20.2 12 17.3 6.4 20.2 7.5 14 3 9.6 9.2 8.7Z"/></svg>`;
   const rating = `<fieldset class="review-rating peek-rating"><legend>Your rating</legend><div class="peek-rating-stars" role="radiogroup" aria-label="Your rating"><span class="peek-rating-tip" aria-live="polite">Good</span>${[1, 2, 3, 4, 5].map(n => `<label data-rating="${n}"><input class="peek-rating-input" type="radio" name="rating" value="${n}"${n === 3 ? ' checked' : ''} required /><span aria-hidden="true">${star}</span><span class="sr-only">${n} \u2014 ${labels[n - 1]}</span></label>`).join('')}</div></fieldset>`;
-  return `${reviewShowcase('product', reviewData.product || approvedReviews)}<section class="section review-contribute-section"><div class="section-inner"><div class="review-contribute"><div class="review-layout"><div><p class="hero-overline">Your turn</p><h3>Share your Aura.</h3><p>How did it taste? How did it mix? Tell us what made it part of your routine.</p><p class="small">Your review is published immediately after a quick safety check.</p></div><form class="form" data-form="review"><label class="field">Your name<input name="reviewName" maxlength="60" required autocomplete="given-name" /></label><label class="field" aria-hidden="true" style="position:absolute;left:-9999px">Website<input name="website" tabindex="-1" autocomplete="off" /></label>${rating}<label class="field">Your review<textarea name="reviewText" rows="4" minlength="10" maxlength="1000" required placeholder="Tell us about the flavour and your experience"></textarea></label><label class="field review-image-field">Product photos <span class="small">Optional · up to 3</span><input type="file" name="reviewImages" accept="image/jpeg,image/png,image/webp" multiple /></label><div class="review-image-preview" data-review-image-preview aria-live="polite"></div><button type="submit" class="button primary">Submit review</button><div id="review-result" role="status" aria-live="polite"></div></form></div></div></div></section>`;
+  return `${reviewShowcase('product', reviewData.product || approvedReviews)}<section class="section review-contribute-section"><div class="section-inner"><div class="review-contribute"><div class="review-layout"><div><p class="hero-overline">Your turn</p><h3>Share your Aura.</h3><p>How did it taste? How did it mix? Tell us what made it part of your routine.</p><p class="small">Your review is published immediately after a quick safety check.</p></div><form class="form" data-form="review"><label class="field">Your name<input name="reviewName" maxlength="60" required autocomplete="given-name" /></label><label class="field" aria-hidden="true" style="position:absolute;left:-9999px">Website<input name="website" tabindex="-1" autocomplete="off" /></label>${rating}<label class="field">Your review<textarea name="reviewText" rows="4" minlength="10" maxlength="1000" required placeholder="Tell us about the flavour and your experience"></textarea></label><label class="field review-image-field">Product photo <span class="small">Optional · 1 image, automatically compressed</span><input type="file" name="reviewImages" accept="image/jpeg,image/png,image/webp" /></label><div class="review-image-preview" data-review-image-preview aria-live="polite"></div><button type="submit" class="button primary">Submit review</button><div id="review-result" role="status" aria-live="polite"></div></form></div></div></div></section>`;
 }
 
 function reviewContribution() {
@@ -1972,9 +1983,9 @@ async function handleForm(event) {
     const submit = form.querySelector('button[type="submit"]'); submit.disabled = true; result.textContent = 'Publishing your review...';
     try {
       const files = Array.from(form.elements.reviewImages.files || []);
-      if (files.length > 3) throw new Error('Choose no more than 3 product photos.');
+      if (files.length > 1) throw new Error('Choose one product photo.');
       if (files.length) result.textContent = 'Preparing and compressing your photos...';
-      const images = await Promise.all(files.map(compressReviewImage));
+      const images = files.length ? [await compressReviewImage(files[0])] : [];
       result.textContent = 'Publishing your review...';
       const response = await fetch('/api/reviews', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ productHandle: reviewProductHandle(), displayName: name, rating, reviewText: text, website: form.elements.website.value, images }) });
       const payload = await response.json();

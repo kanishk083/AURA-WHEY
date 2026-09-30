@@ -1,6 +1,7 @@
 alter table public.reviews add column if not exists image_paths text[] not null default '{}';
 alter table public.reviews drop constraint if exists reviews_image_paths_limit;
-alter table public.reviews add constraint reviews_image_paths_limit check (cardinality(image_paths) <= 3);
+update public.reviews set image_paths = image_paths[1:1] where cardinality(image_paths) > 1;
+alter table public.reviews add constraint reviews_image_paths_limit check (cardinality(image_paths) <= 1);
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('review-images', 'review-images', true, 800000, array['image/webp'])

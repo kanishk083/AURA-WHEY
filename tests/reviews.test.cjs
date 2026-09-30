@@ -78,12 +78,13 @@ test('review deletion uses confirmation and never places owner tokens in URLs', 
   assert.doesNotMatch(source, /ownerToken=.*encodeURIComponent/);
 });
 
-test('review form accepts up to three product photos and cards render safe image galleries', () => {
+test('review form accepts one product photo and cards render safe image galleries', () => {
   const { run } = storefront();
   const form = run('productReviews()');
   assert.ok(form.includes('name="reviewImages"'));
   assert.ok(form.includes('accept="image/jpeg,image/png,image/webp"'));
-  assert.ok(form.includes('Optional · up to 3'));
+  assert.ok(form.includes('Optional · 1 image, automatically compressed'));
+  assert.doesNotMatch(form, /multiple/);
   const card = run(`reviewCard({ id: '123e4567-e89b-42d3-a456-426614174000', productName: 'Mawa Kulfi', displayName: 'Customer', rating: 5, reviewText: 'Photo review.', imageUrls: ['https://fixture.supabase.co/photo.webp'] })`);
   assert.ok(card.includes('review-photo-grid'));
   assert.ok(card.includes('loading="lazy"'));
