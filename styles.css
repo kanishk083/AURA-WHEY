@@ -1028,7 +1028,7 @@ body.search-open { overflow: hidden; }
 .cart-drawer .cart-item-price { margin: 0 0 .1rem; }
 .cart-drawer .item-price { display: inline; margin: 0; font: 800 1.15rem/1.2 Montserrat, Arial, sans-serif; }
 .cart-drawer .line-total { margin: 0 0 .6rem; color: var(--muted); font-size: .8rem; }
-.cart-drawer .cart-item-controls { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.cart-drawer .cart-item-controls { position: relative; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .cart-drawer .cart-item-select { display: inline-flex; align-items: center; gap: .35rem; color: var(--muted); font-size: .82rem; }
 .cart-drawer .cart-item-select select { border: 1px solid var(--line-strong); border-radius: 6px; padding: .3rem .2rem .3rem .5rem; background: var(--surface); color: var(--text); font: 700 .82rem/1.2 Montserrat, Arial, sans-serif; cursor: pointer; }
 .cart-drawer .quantity-button { min-height: 32px; min-width: 32px; border-radius: 6px; font-size: .95rem; }
