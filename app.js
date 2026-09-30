@@ -834,7 +834,12 @@ async function loadReviews(scope = 'product') {
     if (section) section.querySelector('.review-board').innerHTML = `<p class="review-error" role="alert">${escapeHtml(error.message)}</p>`;
     return;
   }
-  if (section) { section.querySelector('.review-board').innerHTML = approvedReviewCards(reviewData[scope], scope); bindReviewInteractions(section); }
+  if (section) {
+    const fullReviewsPage = currentRoute() === 'reviews';
+    const options = { limit: !fullReviewsPage, showMore: !fullReviewsPage, showDate: true };
+    section.querySelector('.review-board').innerHTML = approvedReviewCards(reviewData[scope], scope, options);
+    bindReviewInteractions(section);
+  }
 }
 
 function updateReviewState(id, values) { for (const scope of ['home', 'product']) if (reviewData[scope]) reviewData[scope] = reviewData[scope].map(review => review.id === id ? { ...review, ...values } : review); }
