@@ -1,6 +1,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { storefront } = require('./storefront-helper.cjs');
+const root = path.resolve(__dirname, '..');
 
 test('reviews section combines community love, approved cards and the submission form', () => {
   const { run } = storefront();
@@ -44,6 +47,49 @@ test('homepage renders the all-flavour customer review section', () => {
   const markup = run('home()');
   assert.ok(markup.includes('data-review-scope="home"'));
   assert.ok(markup.includes('Mawa Kulfi and Rich Chocolate'));
+});
+
+test('View more reviews targets the full-page collection anchor', () => {
+  const { run } = storefront();
+  const reviews = Array.from({ length: 4 }, (_, index) => ({ approved: true, displayName: `Customer ${index}`, rating: 5, reviewText: 'Excellent product.' }));
+  const homeCards = run(`approvedReviewCards(${JSON.stringify(reviews)}, 'home', { limit: true, showMore: true })`);
+  const fullPage = run('reviewsPage()');
+  assert.match(homeCards, /href="\/reviews#reviews-collection"/);
+  assert.match(homeCards, /data-route="reviews#reviews-collection"/);
+  assert.match(fullPage, /id="reviews-collection"/);
+  assert.match(fullPage, /Love from the routine/);
+});
+
+test('hashed Reviews navigation scrolls after render while plain Reviews navigation stays at page top', () => {
+  const { context, run } = storefront();
+  const calls = [];
+  context.captureScroll = options => calls.push(options);
+  context.document.getElementById = id => id === 'reviews-collection' ? { scrollIntoView: options => context.captureScroll({ target: id, ...options }) } : null;
+  context.window.scrollTo = options => context.captureScroll({ target: 'window', ...options });
+  run("navigate('reviews#reviews-collection')");
+  assert.equal(run('location.pathname'), '/reviews');
+  assert.equal(run('location.hash'), '#reviews-collection');
+  assert.deepEqual(calls.pop(), { target: 'reviews-collection', block: 'start', behavior: 'instant' });
+  run("navigate('reviews')");
+  assert.equal(run('location.hash'), '');
+  assert.deepEqual(calls.pop(), { target: 'window', top: 0, left: 0, behavior: 'instant' });
+});
+
+test('every Reviews pagination action scrolls only after its page renders', () => {
+  const { context, run } = storefront();
+  const pages = [];
+  context.capturePage = page => pages.push(page);
+  run('renderReviewsPage = () => true; scrollReviewsCollection = () => capturePage(state.reviewPage)');
+  for (const page of [2, 1, 2, 1]) run(`handleAction('reviews-page', { dataset: { page: '${page}' } })`);
+  assert.deepEqual(pages, [2, 1, 2, 1]);
+  run('renderReviewsPage = () => false');
+  run("handleAction('reviews-page', { dataset: { page: '2' } })");
+  assert.deepEqual(pages, [2, 1, 2, 1], 'failed renders do not move the viewport');
+});
+
+test('Reviews collection offsets scrolling by the sticky announcement and header heights', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /#reviews-collection\s*\{[^}]*scroll-margin-top:\s*calc\(var\(--banner-h\) \+ var\(--header-h\) \+ 1rem\)/);
 });
 
 test('product reviews use compact horizontal cards with two-way controls', () => {

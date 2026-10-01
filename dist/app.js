@@ -125,7 +125,7 @@ const state = {
   sachetPack: null, sachetFlavour: 'Chocolate',
   couponOpen: true, searchQuery: '', heroSlide: 0, theme: localStorage.getItem('aura-theme') || 'dark',
   delivery: { pincode: '', status: 'idle', message: '' },
-  document: 'FSSAI licence', auraDownStreak: 0
+  document: 'FSSAI licence', auraDownStreak: 0, reviewPage: 1
 };
 const customerAccount = { loading: true, authenticated: false, customer: null, error: '' };
 
@@ -182,6 +182,16 @@ function sachetVariant(pack = state.sachetPack, flavour = state.sachetFlavour) {
   const requestedFlavour = pack === 'Duo Pack' ? 'Chocolate' : flavour;
   return commerce.products.Sachets?.variants.nodes.find(variant => optionValue(variant, 'Pack') === pack && optionValue(variant, 'Flavor') === requestedFlavour);
 }
+function sachetCartLine(pack, flavour) {
+  const variant = sachetVariant(pack, flavour);
+  return commerce.cart?.lines.nodes.find(line => line.merchandise?.id === variant?.id) || null;
+}
+function sachetCartQuantity(line) {
+  const decreaseAction = line.quantity > 1 ? 'line-down' : 'line-remove';
+  const decreaseLabel = line.quantity > 1 ? 'Decrease sachet quantity' : 'Remove sachets';
+  const decreaseIcon = line.quantity > 1 ? '\u2212' : icon('trash');
+  return `<div class="sachet-cart-qty" role="group" aria-label="Sachet quantity"><button type="button" class="pack-btn${line.quantity === 1 ? ' pack-trash' : ''}" data-action="${decreaseAction}" data-line-id="${escapeHtml(line.id)}" aria-label="${decreaseLabel}">${decreaseIcon}</button><output aria-live="polite">${line.quantity}</output><button type="button" class="pack-btn" data-action="line-up" data-line-id="${escapeHtml(line.id)}" aria-label="Increase sachet quantity">+</button></div>`;
+}
 function sachetPrice(pack, flavour = state.sachetFlavour) { return formatMoney(sachetVariant(pack, flavour)?.price); }
 function sachetComparePrice(pack, flavour = state.sachetFlavour) { return formatMoney(sachetVariant(pack, flavour)?.compareAtPrice); }
 function liveTitle(flavour = state.flavour) { return escapeHtml(commerce.products[flavour]?.title || 'Aura Whey ' + flavour); }
@@ -206,6 +216,7 @@ function variantPicker() {
 function acceptCart(cart) {
   commerce.cart = cart;
   state.cart = cart?.totalQuantity || 0;
+  if (!state.cart) resetCartConfetti();
   try {
     if (cart) localStorage.setItem(cartStorageKey, cart.id);
     else localStorage.removeItem(cartStorageKey);
@@ -290,7 +301,7 @@ function cartLineIdentity(variant) {
 function appliedCoupons() {
   const codes = commerce.cart?.discountCodes || [];
   if (!codes.length) return '';
-  return codes.map(code => `<div class="applied-coupon"><span class="coupon-party" aria-hidden="true">\u{1F389}\u{1F38A}</span><span class="applied-coupon-code">${escapeHtml(code.code)}</span><span class="applied-coupon-state">${code.applicable ? 'Applied' : 'Not applicable'}</span><button type="button" class="applied-coupon-remove" data-action="remove-coupon" data-code="${escapeHtml(code.code)}" aria-label="Remove coupon ${escapeHtml(code.code)}" ${commerce.busy ? 'disabled' : ''}>Remove</button></div>`).join('');
+  return codes.map(code => `<div class="applied-coupon"><span class="coupon-party" aria-hidden="true">✓</span><span class="applied-coupon-details"><span class="applied-coupon-code">${escapeHtml(code.code)}</span><span class="applied-coupon-state">${code.applicable ? 'Applied' : 'Not applicable'}</span></span><button type="button" class="applied-coupon-remove" data-action="remove-coupon" data-code="${escapeHtml(code.code)}" aria-label="Remove coupon ${escapeHtml(code.code)}" ${commerce.busy ? 'disabled' : ''}>Remove</button></div>`).join('');
 }
 
 function deliveryPincodeCard() {
@@ -301,7 +312,16 @@ function deliveryPincodeCard() {
     : status === 'error' || status === 'unavailable'
       ? `<p class="delivery-result is-error" role="alert">${escapeHtml(message)}</p>`
       : saved ? `<p class="delivery-result" role="status">${escapeHtml(message || 'Pincode saved.')}</p>` : '';
-  return `<section class="summary-card"><h3 class="summary-card-title">Enter delivery pincode</h3>${saved ? `<div class="pincode-saved"><span class="pincode-value">${escapeHtml(pincode)}</span>${result}<button type="button" class="text-button pincode-change" data-action="change-pincode">Change pincode</button></div>` : `<div class="inline-action-row"><input id="summary-pincode" name="summary-pincode" inputmode="numeric" autocomplete="postal-code" maxlength="6" placeholder="Enter pincode here" aria-label="Delivery pincode" /><button type="button" class="button" data-action="check-pincode">Check</button></div><p class="summary-card-note">Enter your pincode to check delivery availability.</p>`}</section>`;
+  return `<section class="summary-card" data-delivery-summary><h3 class="summary-card-title">Enter delivery pincode</h3>${saved ? `<div class="pincode-saved"><span class="pincode-mark" aria-hidden="true">${icon('mapPin')}</span><div class="pincode-details"><span class="pincode-caption">Delivering to</span><span class="pincode-value">${escapeHtml(pincode)}</span></div><button type="button" class="pincode-change" data-action="change-pincode">Change</button>${result}</div>` : `<div class="inline-action-row"><input id="summary-pincode" name="summary-pincode" inputmode="numeric" autocomplete="postal-code" maxlength="6" placeholder="Enter pincode here" aria-label="Enter delivery pincode" /><button type="button" class="button" data-action="check-pincode">Check</button></div><p class="summary-card-note">Enter your pincode to check delivery availability.</p>`}</section>`;
+}
+
+function patchDeliverySummary() {
+  const current = document.querySelector('[data-delivery-summary]');
+  if (!current) return false;
+  const template = document.createElement('template');
+  template.innerHTML = deliveryPincodeCard();
+  current.replaceWith(template.content.firstElementChild);
+  return true;
 }
 
 function cartSummaryMarkup() {
@@ -365,6 +385,14 @@ function patchProductQuantityControls() {
   });
 }
 
+function patchSachetQuantityControls() {
+  document.querySelectorAll('.sachet-cart-qty').forEach(control => {
+    const lineId = control.querySelector('[data-line-id]')?.dataset.lineId;
+    const line = commerce.cart?.lines.nodes.find(item => item.id === lineId);
+    if (line) control.outerHTML = sachetCartQuantity(line);
+  });
+}
+
 async function addShopifyProduct(flavour, quantity, buyNow = false) {
   const variant = selectedVariant(flavour);
   if (!variant?.availableForSale || !Number.isInteger(quantity) || quantity < 1) return;
@@ -396,7 +424,11 @@ async function changeCartLine(action, id) {
       if (!updated || updated.quantity === line.quantity) return;
       if (action === 'line-up') state.auraDownStreak = 0;
       else state.auraDownStreak += 1;
-      showToast(action === 'line-up' ? `+${updated.quantity * 1000} AURA` : `\u2212${state.auraDownStreak * 1000} AURA`);
+      const reward = action === 'line-up' ? `+${updated.quantity * 1000} AURA` : `\u2212${state.auraDownStreak * 1000} AURA`;
+      const sachetControl = document.querySelector(`.sachet-cart-qty [data-line-id="${CSS.escape(id)}"]`)?.closest('.sachet-cart-qty');
+      const cartControl = sachetControl || document.querySelector(`.cart-item[data-line-id="${CSS.escape(id)}"] .cart-item-controls`);
+      if (cartControl) showAuraBurst(cartControl, reward);
+      else showToast(reward);
     });
 }
 
@@ -490,6 +522,7 @@ function shell(content) {
       </header>
       <div class="overlay" data-action="close-menu"></div>
       <aside class="cart-drawer" id="cart-drawer" aria-label="Your cart" aria-hidden="true" inert>
+        <div class="cart-confetti" data-cart-confetti aria-hidden="true"></div>
         <div class="cart-drawer-head"><h2>Your cart</h2><button type="button" class="icon-button" data-action="close-cart" aria-label="Close cart">${icon('close')}</button></div>
         <div class="cart-drawer-body">${cart()}</div>
       </aside>
@@ -681,64 +714,120 @@ function reviewVisitorId() {
 function blobDataUrl(blob) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('Unable to prepare this photo.')); reader.readAsDataURL(blob); }); }
 
 async function compressReviewImage(file) {
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 15_000_000) throw new Error('Choose JPEG, PNG, or WebP photos under 15 MB.');
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 50_000_000) throw new Error('Choose one JPEG, PNG, or WebP photo under 50 MB.');
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
-  const encode = quality => new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
-  let output = await encode(.82); if (output?.size > 650_000) output = await encode(.68);
-  if (!output || output.size > 900_000) throw new Error('One photo is too detailed to compress. Try a smaller image.');
-  return blobDataUrl(output);
+  const longestSide = Math.max(bitmap.width, bitmap.height);
+  const canvas = document.createElement('canvas');
+  const encode = (maxSide, quality) => new Promise((resolve, reject) => {
+    const scale = Math.min(1, maxSide / longestSide);
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Unable to prepare this photo.')), 'image/webp', quality);
+  });
+  try {
+    for (const [maxSide, quality] of [[2000, .84], [1800, .78], [1600, .72], [1400, .66], [1200, .6]]) {
+      const output = await encode(maxSide, quality);
+      if (output.size <= 850_000) return blobDataUrl(output);
+    }
+  } finally { bitmap.close(); }
+  throw new Error('This photo could not be compressed. Please try another image.');
 }
 
 function previewReviewImages(input) {
   const preview = input.form?.querySelector('[data-review-image-preview]'); if (!preview) return;
   const files = Array.from(input.files || []);
-  if (files.length > 3) { input.value = ''; preview.textContent = 'Choose no more than 3 photos.'; return; }
+  if (files.length > 1) { input.value = ''; preview.textContent = 'Choose one photo.'; return; }
   preview.replaceChildren(...files.map(file => { const img = document.createElement('img'); const url = URL.createObjectURL(file); img.src = url; img.alt = ''; img.onload = () => URL.revokeObjectURL(url); return img; }));
 }
 
-function reviewCard(review) {
+function reviewProductHandle() {
+  return shopSection() === 'sachets' ? SHOPIFY_CONFIG.products.Sachets : SHOPIFY_CONFIG.products[state.flavour];
+}
+
+function reviewProductLabel() {
+  return shopSection() === 'sachets' ? '35g Sachets' : state.flavour;
+}
+
+function formatReviewDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+}
+
+function reviewCard(review, options = {}) {
   const rating = Math.max(1, Math.min(5, Number(review.rating) || 1));
   const name = String(review.displayName || review.name || 'Aura Whey customer').trim();
   const initials = name.split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join('').toUpperCase() || 'AW';
   const badge = review.verified ? 'Verified purchase' : 'Customer review';
   const id = String(review.id || '');
   const owned = Boolean(id && reviewOwners()[id]);
-  const photos = Array.isArray(review.imageUrls) ? review.imageUrls.slice(0, 3) : [];
+  const photos = Array.isArray(review.imageUrls) ? review.imageUrls.slice(0, 1) : [];
   const gallery = photos.length ? `<div class="review-photo-grid">${photos.map((url, index) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" aria-label="Open review photo ${index + 1}"><img src="${escapeHtml(url)}" alt="Product photo shared by ${escapeHtml(name)}" loading="lazy" /></a>`).join('')}</div>` : '';
-  return `<article class="review-card" data-review-id="${escapeHtml(id)}"><div class="review-card-top"><span class="review-avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(review.productName || review.flavour || state.flavour)}</span></div></div><div class="review-stars" aria-label="${rating} out of 5 stars">${'\u2605'.repeat(rating)}<span aria-hidden="true">${'\u2606'.repeat(5 - rating)}</span></div><p class="review-copy">\u201c${escapeHtml(review.reviewText || review.text || '')}\u201d</p>${gallery}<div class="review-card-actions"><span class="review-badge">${escapeHtml(badge)}</span>${id ? `<button type="button" class="review-like${review.liked ? ' is-liked' : ''}" data-review-like aria-pressed="${review.liked ? 'true' : 'false'}"><span aria-hidden="true">${review.liked ? '\u2665' : '\u2661'}</span> <b>${Number(review.likeCount || 0)}</b></button>${owned ? '<button type="button" class="review-delete" data-review-delete>Delete review</button>' : ''}` : ''}</div></article>`;
+  const productLabel = reviewProductLabel() === '35g Sachets' ? '35g Sachets' : (review.productName || review.flavour || reviewProductLabel());
+  const date = options.showDate ? formatReviewDate(review.createdAt) : '';
+  const dateMarkup = date ? `<time class="review-date" datetime="${escapeHtml(review.createdAt)}">${escapeHtml(date)}</time>` : '';
+  return `<article class="review-card${date ? ' has-date' : ''}" data-review-id="${escapeHtml(id)}">${dateMarkup}<div class="review-card-top"><span class="review-avatar" aria-hidden="true">${escapeHtml(initials)}</span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(productLabel)}</span></div></div><div class="review-stars" aria-label="${rating} out of 5 stars">${'\u2605'.repeat(rating)}<span aria-hidden="true">${'\u2606'.repeat(5 - rating)}</span></div><p class="review-copy">\u201c${escapeHtml(review.reviewText || review.text || '')}\u201d</p>${gallery}<div class="review-card-actions"><span class="review-badge">${escapeHtml(badge)}</span>${id ? `<button type="button" class="review-like${review.liked ? ' is-liked' : ''}" data-review-like aria-pressed="${review.liked ? 'true' : 'false'}"><span class="review-like-animation" aria-hidden="true"></span><span class="review-like-symbol" aria-hidden="true">${review.liked ? '\u2665' : '\u2661'}</span> <b>${Number(review.likeCount || 0)}</b></button>${owned ? '<button type="button" class="review-delete" data-review-delete>Delete review</button>' : ''}` : ''}</div></article>`;
 }
 
-function approvedReviewCards(reviews = approvedReviews, scope = 'product') {
-  const visible = reviews.filter(review => review && review.approved !== false && (scope === 'home' || review.shopifyProductHandle === SHOPIFY_CONFIG.products[state.flavour]));
+function approvedReviewCards(reviews = approvedReviews, scope = 'product', options = {}) {
+  const visible = reviews.filter(review => review && review.approved !== false && (scope === 'home' || review.shopifyProductHandle === reviewProductHandle()));
   if (!visible.length) {
-    const subject = scope === 'home' ? 'Mawa Kulfi and Rich Chocolate' : state.flavour;
+    const subject = scope === 'home' ? 'Mawa Kulfi and Rich Chocolate' : reviewProductLabel();
     return `<div class="review-empty"><span aria-hidden="true">\u2606</span><div><h3>Community stories are warming up.</h3><p>Approved customer reviews for ${escapeHtml(subject)} will appear here.</p></div></div>`;
   }
   const className = scope === 'product' ? 'review-card-track' : 'review-card-grid';
-  const label = scope === 'product' ? `Customer reviews for ${state.flavour}` : 'Customer reviews for all Aura Whey flavours';
-  return `<div class="${className}" aria-label="${escapeHtml(label)}">${visible.map(reviewCard).join('')}</div>`;
+  const label = scope === 'product' ? `Customer reviews for ${reviewProductLabel()}` : 'Customer reviews for all Aura Whey flavours';
+  const limited = scope === 'home' && options.limit !== false;
+  const paginated = scope === 'home' && options.paginate === true;
+  const pageSize = 7;
+  const pageCount = paginated ? Math.ceil(visible.length / pageSize) : 1;
+  const currentPage = paginated ? Math.min(Math.max(Number(options.page) || 1, 1), pageCount) : 1;
+  const displayed = paginated ? visible.slice((currentPage - 1) * pageSize, currentPage * pageSize) : limited ? visible.slice(0, 3) : visible;
+  const cards = displayed.map(review => reviewCard(review, { showDate: scope === 'home' || options.showDate })).join('');
+  const more = limited && options.showMore !== false && visible.length > 3 ? routeLink('reviews#reviews-collection', 'View more reviews', 'button-link secondary review-view-more') : '';
+  const pagination = paginated && pageCount > 1 ? `<nav class="review-pagination" aria-label="Reviews pages"><button type="button" class="button" data-action="reviews-page" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>Previous</button><div class="review-page-numbers">${Array.from({ length: pageCount }, (_, index) => index + 1).map(page => `<button type="button" class="button${page === currentPage ? ' active' : ''}" data-action="reviews-page" data-page="${page}" aria-label="Go to reviews page ${page}"${page === currentPage ? ' aria-current="page"' : ''}>${page}</button>`).join('')}</div><button type="button" class="button" data-action="reviews-page" data-page="${currentPage + 1}" ${currentPage === pageCount ? 'disabled' : ''}>Next</button></nav>` : '';
+  return `<div class="${className}" aria-label="${escapeHtml(label)}">${cards}</div>${pagination}${more}`;
 }
 
-function reviewShowcase(scope = 'home', reviews = approvedReviews) {
+function reviewShowcase(scope = 'home', reviews = approvedReviews, options = {}) {
   const isProduct = scope === 'product';
   const titleId = isProduct ? 'product-customer-reviews-title' : 'home-customer-reviews-title';
-  const hasVisibleReviews = reviews.some(review => review?.approved === true && (!isProduct || !review.flavour || review.flavour === state.flavour));
+  const sectionId = options.collectionId ? ` id="${escapeHtml(options.collectionId)}"` : '';
+  const hasVisibleReviews = reviews.some(review => review?.approved === true && (!isProduct || review.shopifyProductHandle === reviewProductHandle()));
   const controls = isProduct && hasVisibleReviews ? `<div class="review-carousel-controls" aria-label="Review carousel controls"><button type="button" class="button" data-action="reviews-prev" aria-label="Previous review">${icon('arrowLeft')}</button><button type="button" class="button" data-action="reviews-next" aria-label="Next review">${icon('arrowRight')}</button></div>` : '';
   const supportingCopy = isProduct
-    ? `What ${escapeHtml(state.flavour)} customers say \u2014 people who take their training seriously and still believe a great shake should make them smile.`
+    ? `What ${escapeHtml(reviewProductLabel())} customers say \u2014 people who take their training seriously and still believe a great shake should make them smile.`
     : 'A collection of love for Mawa Kulfi and Rich Chocolate from people who take their fitness and wellbeing seriously.';
-  return `<section class="section product-reviews review-showcase-${scope}" data-review-scope="${scope}" aria-labelledby="${titleId}"><div class="section-inner"><div class="review-heading-row"><header class="review-love-header"><p class="hero-overline">Love from the routine</p><h2 id="${titleId}">Strong routines. Big love.</h2><p>${supportingCopy}</p></header>${controls}</div><div class="review-board">${approvedReviewCards(reviews, scope)}${isProduct ? '<article id="review-preview" class="review-card review-preview" hidden></article>' : ''}</div></div></section>`;
+  return `<section${sectionId} class="section product-reviews review-showcase-${scope}" data-review-scope="${scope}" aria-labelledby="${titleId}"><div class="section-inner"><div class="review-heading-row"><header class="review-love-header"><p class="hero-overline">Love from the routine</p><h2 id="${titleId}">Strong routines. Big love.</h2><p>${supportingCopy}</p></header>${controls}</div><div class="review-board">${approvedReviewCards(reviews, scope, options)}${isProduct ? '<article id="review-preview" class="review-card review-preview" hidden></article>' : ''}</div></div></section>`;
+}
+
+function reviewsPage() {
+  return `<section class="page-intro compact"><p class="hero-overline">The full collection</p><h1>Every routine has a story.</h1><p>Read what the Aura Whey community has shared across Mawa Kulfi, Rich Chocolate, and 35g Sachets.</p></section>${reviewShowcase('home', reviewData.home || approvedReviews, { paginate: true, page: state.reviewPage, showMore: false, showDate: true, collectionId: 'reviews-collection' })}`;
+}
+
+function renderReviewsPage() {
+  const section = document.querySelector('[data-review-scope="home"]');
+  if (!section || !reviewData.home) return false;
+  section.querySelector('.review-board').innerHTML = approvedReviewCards(reviewData.home, 'home', { paginate: true, page: state.reviewPage, showMore: false, showDate: true });
+  bindReviewInteractions(section);
+  return true;
 }
 
 
 function productReviews() {
   const labels = ['Poor', 'Fair', 'Good', 'Great', 'Superb'];
   const star = `<svg viewBox="0 0 24 24" width="36" height="36" focusable="false"><path fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round" d="M12 3 14.8 8.7 21 9.6 16.5 14 17.6 20.2 12 17.3 6.4 20.2 7.5 14 3 9.6 9.2 8.7Z"/></svg>`;
-  const rating = `<fieldset class="review-rating peek-rating"><legend>Your rating</legend><div class="peek-rating-stars" role="radiogroup" aria-label="Your rating"><span class="peek-rating-tip" aria-live="polite">Good</span>${[1, 2, 3, 4, 5].map(n => `<label data-rating="${n}"><input class="peek-rating-input" type="radio" name="rating" value="${n}"${n === 3 ? ' checked' : ''} required /><span aria-hidden="true">${star}</span><span class="sr-only">${n} \u2014 ${labels[n - 1]}</span></label>`).join('')}</div></fieldset>`;
-  return `${reviewShowcase('product', reviewData.product || approvedReviews)}<section class="section review-contribute-section"><div class="section-inner"><div class="review-contribute"><div class="review-layout"><div><p class="hero-overline">Your turn</p><h3>Share your Aura.</h3><p>How did it taste? How did it mix? Tell us what made it part of your routine.</p><p class="small">Your review is published immediately after a quick safety check.</p></div><form class="form" data-form="review"><label class="field">Your name<input name="reviewName" maxlength="60" required autocomplete="given-name" /></label><label class="field" aria-hidden="true" style="position:absolute;left:-9999px">Website<input name="website" tabindex="-1" autocomplete="off" /></label>${rating}<label class="field">Your review<textarea name="reviewText" rows="4" minlength="10" maxlength="1000" required placeholder="Tell us about the flavour and your experience"></textarea></label><label class="field review-image-field">Product photos <span class="small">Optional · up to 3</span><input type="file" name="reviewImages" accept="image/jpeg,image/png,image/webp" multiple /></label><div class="review-image-preview" data-review-image-preview aria-live="polite"></div><button type="submit" class="button primary">Submit review</button><div id="review-result" role="status" aria-live="polite"></div></form></div></div></div></section>`;
+  const rating = `<fieldset class="review-rating peek-rating"><legend>Your rating</legend><div class="peek-rating-stars" role="radiogroup" aria-label="Your rating"><span class="peek-rating-tip" aria-live="polite">Choose a rating</span>${[1, 2, 3, 4, 5].map(n => `<label data-rating="${n}"><input class="peek-rating-input" type="radio" name="rating" value="${n}" required /><span aria-hidden="true">${star}</span><span class="sr-only">${n} \u2014 ${labels[n - 1]}</span></label>`).join('')}</div></fieldset>`;
+  return `${reviewShowcase('product', reviewData.product || approvedReviews)}<section class="section review-contribute-section"><div class="section-inner"><div class="review-contribute"><div class="review-layout"><div><p class="hero-overline">Your turn</p><h3>Share your Aura.</h3><p>How did it taste? How did it mix? Tell us what made it part of your routine.</p><p class="small">Your review is published immediately after a quick safety check.</p></div><form class="form" data-form="review"><label class="field">Your name<input name="reviewName" maxlength="60" required autocomplete="given-name" /></label><label class="field" aria-hidden="true" style="position:absolute;left:-9999px">Website<input name="website" tabindex="-1" autocomplete="off" /></label>${rating}<label class="field">Your review<textarea name="reviewText" rows="4" minlength="10" maxlength="1000" required placeholder="Tell us about the flavour and your experience"></textarea></label><label class="field review-image-field">Product photo <span class="small">Optional · 1 image, automatically compressed</span><input type="file" name="reviewImages" accept="image/jpeg,image/png,image/webp" /></label><div class="review-image-preview" data-review-image-preview aria-live="polite"></div><button type="submit" class="button primary">Submit review</button><div id="review-result" role="status" aria-live="polite"></div></form></div></div></div></section>`;
+}
+
+function reviewContribution() {
+  const showcase = reviewShowcase('product', reviewData.product || approvedReviews);
+  return productReviews().replace(showcase, '');
 }
 
 function showSavedReview() {
@@ -770,7 +859,7 @@ function showSavedReview() {
 }
 
 async function loadReviews(scope = 'product') {
-  const url = scope === 'home' ? '/api/reviews?scope=home' : '/api/reviews?product=' + encodeURIComponent(SHOPIFY_CONFIG.products[state.flavour]);
+  const url = scope === 'home' ? '/api/reviews?scope=home' : '/api/reviews?product=' + encodeURIComponent(reviewProductHandle());
   const section = document.querySelector(`[data-review-scope="${scope}"]`);
   if (section) section.querySelector('.review-board').innerHTML = '<p class="review-loading" role="status">Loading reviews...</p>';
   try {
@@ -782,18 +871,33 @@ async function loadReviews(scope = 'product') {
     if (section) section.querySelector('.review-board').innerHTML = `<p class="review-error" role="alert">${escapeHtml(error.message)}</p>`;
     return;
   }
-  if (section) { section.querySelector('.review-board').innerHTML = approvedReviewCards(reviewData[scope], scope); bindReviewInteractions(section); }
+  if (section) {
+    const fullReviewsPage = currentRoute() === 'reviews';
+    const options = fullReviewsPage ? { paginate: true, page: state.reviewPage, showMore: false, showDate: true } : { limit: true, showMore: true, showDate: true };
+    section.querySelector('.review-board').innerHTML = approvedReviewCards(reviewData[scope], scope, options);
+    bindReviewInteractions(section);
+  }
 }
 
 function updateReviewState(id, values) { for (const scope of ['home', 'product']) if (reviewData[scope]) reviewData[scope] = reviewData[scope].map(review => review.id === id ? { ...review, ...values } : review); }
+
+function playReviewLikeAnimation(button) {
+  if (!button || !window.lottie || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const container = button.querySelector('.review-like-animation'); if (!container) return;
+  button.classList.add('is-animating');
+  container.replaceChildren();
+  const animation = window.lottie.loadAnimation({ container, renderer: 'svg', loop: false, autoplay: true, path: 'assets/animations/review-like.json' });
+  animation.addEventListener('complete', () => { animation.destroy(); button.classList.remove('is-animating'); });
+}
 
 async function toggleReviewLike(button) {
   if (button.disabled) return;
   const id = button.closest('[data-review-id]')?.dataset.reviewId; if (!id) return;
   const wasLiked = button.getAttribute('aria-pressed') === 'true'; const count = Number(button.querySelector('b').textContent) || 0;
-  button.disabled = true; button.classList.toggle('is-liked', !wasLiked); button.setAttribute('aria-pressed', String(!wasLiked)); button.querySelector('span').textContent = wasLiked ? '\u2661' : '\u2665'; button.querySelector('b').textContent = String(Math.max(0, count + (wasLiked ? -1 : 1)));
-  try { const response = await fetch(`/api/reviews/${encodeURIComponent(id)}/like`, { method: wasLiked ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ visitorId: reviewVisitorId() }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.message || 'Unable to update this review.'); updateReviewState(id, payload); button.classList.toggle('is-liked', payload.liked); button.setAttribute('aria-pressed', String(payload.liked)); button.querySelector('span').textContent = payload.liked ? '\u2665' : '\u2661'; button.querySelector('b').textContent = String(payload.likeCount); }
-  catch (error) { button.classList.toggle('is-liked', wasLiked); button.setAttribute('aria-pressed', String(wasLiked)); button.querySelector('span').textContent = wasLiked ? '\u2665' : '\u2661'; button.querySelector('b').textContent = String(count); showToast(error.message); }
+  const symbol = button.querySelector('.review-like-symbol');
+  button.disabled = true; button.classList.toggle('is-liked', !wasLiked); button.setAttribute('aria-pressed', String(!wasLiked)); symbol.textContent = wasLiked ? '\u2661' : '\u2665'; button.querySelector('b').textContent = String(Math.max(0, count + (wasLiked ? -1 : 1)));
+  try { const response = await fetch(`/api/reviews/${encodeURIComponent(id)}/like`, { method: wasLiked ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ visitorId: reviewVisitorId() }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.message || 'Unable to update this review.'); updateReviewState(id, payload); button.classList.toggle('is-liked', payload.liked); button.setAttribute('aria-pressed', String(payload.liked)); symbol.textContent = payload.liked ? '\u2665' : '\u2661'; button.querySelector('b').textContent = String(payload.likeCount); if (payload.liked && !wasLiked) playReviewLikeAnimation(button); }
+  catch (error) { button.classList.toggle('is-liked', wasLiked); button.setAttribute('aria-pressed', String(wasLiked)); symbol.textContent = wasLiked ? '\u2665' : '\u2661'; button.querySelector('b').textContent = String(count); showToast(error.message); }
   finally { button.disabled = false; }
 }
 
@@ -810,7 +914,7 @@ function bindReviewInteractions(root = document) { root.querySelectorAll('[data-
 function loadReviewsForPage() {
   const reviewImages = document.querySelector('input[name="reviewImages"]'); if (reviewImages) reviewImages.onchange = () => previewReviewImages(reviewImages);
   if (currentRoute() === 'shop') loadReviews('product');
-  if (currentRoute() === 'home') loadReviews('home');
+  if (currentRoute() === 'home' || currentRoute() === 'reviews') loadReviews('home');
 }
 
 function storeFaq() {
@@ -894,7 +998,10 @@ function syncShopRouteState() {
 
 function shop() {
   syncShopRouteState();
-  return shopSection() === 'sachets' ? sachetsShop() : wheyShop();
+  const markup = shopSection() === 'sachets' ? sachetsShop() : wheyShop();
+  if (shopSection() !== 'sachets') return markup;
+  const contribution = reviewContribution();
+  return contribution ? markup.replace('<section class="section store-faq">', contribution + '<section class="section store-faq">') : markup;
 }
 
 function sachetFlavourPicker(pack) {
@@ -918,11 +1025,16 @@ function sachetCard(pack, title, description) {
   const compare = variant?.compareAtPrice ? `<span class="sachet-compare">Compare-at <del>${sachetComparePrice(pack, flavour)}</del></span>` : '';
   const detail = pack === 'Single Sachet' ? '1 \u00D7 35g sachet' : pack === 'Duo Pack' ? '2 \u00D7 35g sachets' : '7 \u00D7 35g sachets';
   const disabled = commerce.loading || commerce.busy || !commerce.cartReady || !variant?.availableForSale;
-  return `<article class="sachet-card ${active ? 'is-selected' : ''}"><div class="sachet-card-image" data-slide-index="0"><div class="sachet-card-track">${sachetMedia(pack, title)}</div><button type="button" class="sachet-slider-control sachet-slider-prev" data-action="sachet-image-prev" aria-label="Show previous ${escapeHtml(title)} image">${icon('arrowLeft')}</button><button type="button" class="sachet-slider-control sachet-slider-next" data-action="sachet-image-next" aria-label="Show next ${escapeHtml(title)} image">${icon('arrowRight')}</button><div class="sachet-slider-dots" aria-label="Product image position"><button type="button" class="active" data-action="sachet-image-slide" data-slide="0" aria-label="Show front image" aria-pressed="true"></button><button type="button" data-action="sachet-image-slide" data-slide="1" aria-label="Show back image" aria-pressed="false"></button></div></div><div class="sachet-card-body"><p class="hero-overline">${detail}</p><h2>${title}</h2><p>${description}</p><div class="sachet-card-facts"><span>35g</span><span>24g Protein</span><span>5.7g BCAAs</span></div>${sachetFlavourPicker(pack)}<div class="sachet-price"><strong>${sachetPrice(pack, flavour)}</strong>${compare}</div><p class="sachet-stock" role="status">${variant?.availableForSale ? 'In stock' : commerce.loading ? 'Checking availability\u2026' : 'Unavailable'}</p><button type="button" class="button primary" data-action="add-sachet" data-pack="${escapeHtml(pack)}"${flavourData} ${disabled ? 'disabled' : ''}>${commerce.busy ? 'Please wait\u2026' : 'Add to cart'}</button></div></article>`;
+  const line = sachetCartLine(pack, flavour);
+  const purchase = line
+    ? `<div class="sachet-cart-actions">${sachetCartQuantity(line)}<button type="button" class="button primary" data-action="open-cart">Go to cart</button></div>`
+    : `<button type="button" class="button primary" data-action="add-sachet" data-pack="${escapeHtml(pack)}"${flavourData} ${disabled ? 'disabled' : ''}>${commerce.busy ? 'Please wait\u2026' : 'Add to cart'}</button>`;
+  description = description.replace(' plus one ', ' <span class="sachet-plus" aria-hidden="true">+</span> One ');
+  return `<article class="sachet-card ${active ? 'is-selected' : ''}"><div class="sachet-card-image" data-slide-index="0"><div class="sachet-card-track">${sachetMedia(pack, title)}</div><button type="button" class="sachet-slider-control sachet-slider-prev" data-action="sachet-image-prev" aria-label="Show previous ${escapeHtml(title)} image">${icon('arrowLeft')}</button><button type="button" class="sachet-slider-control sachet-slider-next" data-action="sachet-image-next" aria-label="Show next ${escapeHtml(title)} image">${icon('arrowRight')}</button><div class="sachet-slider-dots" aria-label="Product image position"><button type="button" class="active" data-action="sachet-image-slide" data-slide="0" aria-label="Show front image" aria-pressed="true"></button><button type="button" data-action="sachet-image-slide" data-slide="1" aria-label="Show back image" aria-pressed="false"></button></div></div><div class="sachet-card-body"><p class="hero-overline">${detail}</p><h2>${title}</h2><p>${description}</p><div class="sachet-card-facts"><span>35g</span><span>24g Protein</span><span>5.7g BCAAs</span></div>${sachetFlavourPicker(pack)}<div class="sachet-price"><strong>${sachetPrice(pack, flavour)}</strong>${compare}</div><p class="sachet-stock" role="status">${variant?.availableForSale ? 'In stock' : commerce.loading ? 'Checking availability\u2026' : 'Unavailable'}</p>${purchase}</div></article>`;
 }
 
 function sachetsShop() {
-  return `<div class="sachet-shop"><div class="commerce-status">${commerceStatus()}</div><section class="sachet-hero"><div><p class="hero-overline">Protein that travels</p><h1>Aura Whey Protein Sachets</h1><p>24g protein and 5.7g BCAAs in every 35g sachet. Choose a single, a fixed flavour duo, or a seven-sachet travel pack.</p><span class="sachet-delivery">Free delivery on Sachet orders</span></div><div class="sachet-hero-visual">${image(sachetAssets.productInfo, 'Aura Whey Sachet front and back with Rich Chocolate and Mawa Kulfi', 'sachet-hero-image')}</div></section><section class="section sachet-products" aria-labelledby="sachet-products-title"><div class="section-inner"><div class="section-head"><div><p class="hero-overline">Choose your pack</p><h2 id="sachet-products-title">Built for one shake or the whole week.</h2><div class="gold-rule"></div></div><p>Rich Chocolate or Mawa Kulfi. Prices and availability come directly from Shopify.</p></div><div class="sachet-grid">${sachetCard('Single Sachet', 'Single Sachet', 'Choose Rich Chocolate or Mawa Kulfi.')}${sachetCard('Duo Pack', 'Duo Pack', 'One Rich Chocolate plus one Mawa Kulfi sachet.')}${sachetCard('Travel Pack (7 Sachets)', 'Travel Pack \u2014 7 Sachets', 'Seven sachets in your chosen flavour.')}</div></div></section><section class="section sachet-facts"><div class="section-inner"><div><strong>35g</strong><span>Per sachet</span></div><div><strong>24g</strong><span>Protein</span></div><div><strong>5.7g</strong><span>BCAAs</span></div><div><strong>2</strong><span>Rich Chocolate + Mawa Kulfi</span></div></div></section>${storeFaq()}</div>`;
+  return `<div class="sachet-shop"><div class="commerce-status">${commerceStatus()}</div><section class="sachet-hero"><div><p class="hero-overline">Protein that travels</p><h1>Aura Whey Protein Sachets</h1><p>24g protein and 5.7g BCAAs in every 35g sachet. Choose a single, a fixed flavour duo, or a seven-sachet travel pack.</p><span class="sachet-delivery">Free delivery on Sachet orders</span></div><div class="sachet-hero-visual">${image(sachetAssets.productInfo, 'Aura Whey Sachet front and back with Rich Chocolate and Mawa Kulfi', 'sachet-hero-image')}</div></section><section class="section sachet-products" aria-labelledby="sachet-products-title"><div class="section-inner"><div class="section-head"><div><p class="hero-overline">Choose your pack</p><h2 id="sachet-products-title">Built for one shake or the whole week.</h2><div class="gold-rule"></div></div><p>Rich Chocolate or Mawa Kulfi. Prices and availability come directly from Shopify.</p></div><div class="sachet-grid">${sachetCard('Single Sachet', 'Single Sachet', 'Choose Rich Chocolate or Mawa Kulfi.')}${sachetCard('Duo Pack', 'Duo Pack', 'One Rich Chocolate plus one Mawa Kulfi sachet.')}${sachetCard('Travel Pack (7 Sachets)', 'Travel Pack \u2014 7 Sachets', 'Seven sachets in your chosen flavour.')}</div></div></section><section class="section sachet-facts"><div class="section-inner"><div><strong>35g</strong><span>Per sachet</span></div><div><strong>24g</strong><span>Protein</span></div><div><strong>5.7g</strong><span>BCAAs</span></div><div><strong>2</strong><span>Rich Chocolate + Mawa Kulfi</span></div></div></section>${reviewShowcase('product', reviewData.product || approvedReviews)}${storeFaq()}</div>`;
 }
 
 function auraQuantity() {
@@ -964,6 +1076,39 @@ function showAuraBurst(control, text) {
   burst.addEventListener('animationend', () => burst.remove(), { once: true });
 }
 
+function resetCartConfetti() {
+  cartConfettiState.played = false;
+  if (cartConfettiState.timer) clearTimeout(cartConfettiState.timer);
+  cartConfettiState.timer = 0;
+  document.querySelector('[data-cart-confetti]')?.replaceChildren();
+}
+
+function playCartConfetti() {
+  if (cartConfettiState.played || !state.cart || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const container = document.querySelector('[data-cart-confetti]');
+  if (!container) return;
+  cartConfettiState.played = true;
+  const colors = ['#ffcf33', '#f15b5b', '#48c6ef', '#8bd450', '#f58bd5', '#ffffff'];
+  const pieces = Array.from({ length: 90 }, () => {
+    const piece = document.createElement('i');
+    piece.className = `cart-confetti-piece${Math.random() > .22 ? '' : ' is-triangle'}`;
+    piece.style.setProperty('--x', `${Math.random() * 100}%`);
+    piece.style.setProperty('--drift', `${(Math.random() - .5) * 140}px`);
+    piece.style.setProperty('--delay', `${Math.random() * .8}s`);
+    piece.style.setProperty('--duration', `${5.2 + Math.random() * 2.4}s`);
+    piece.style.setProperty('--spin', `${(Math.random() - .5) * 900}deg`);
+    piece.style.setProperty('--w', `${4 + Math.random() * 7}px`);
+    piece.style.setProperty('--h', `${7 + Math.random() * 12}px`);
+    piece.style.setProperty('--color', colors[Math.floor(Math.random() * colors.length)]);
+    return piece;
+  });
+  container.replaceChildren(...pieces);
+  cartConfettiState.timer = setTimeout(() => {
+    container.replaceChildren();
+    cartConfettiState.timer = 0;
+  }, 8500);
+}
+
 function setCartDrawer(open, focusClose = true) {
   const drawer = document.querySelector('.cart-drawer');
   if (!drawer) return;
@@ -974,6 +1119,7 @@ function setCartDrawer(open, focusClose = true) {
   document.querySelector('.overlay')?.classList.toggle('open', open);
   document.querySelector('.overlay')?.setAttribute('data-action', open ? 'close-cart' : 'close-menu');
   document.body.classList.toggle('cart-open', open);
+  if (open) playCartConfetti();
   if (open && focusClose) drawer.querySelector('[data-action="close-cart"]')?.focus();
 }
 
@@ -1317,7 +1463,7 @@ function documentPage() {
   return `<section class="page-intro compact"><p class="hero-overline">Manufacturer document</p><h1>${doc[0]}</h1>${documentCard(doc)}<p>${routeLink('quality', 'Back to quality documents', 'button-link')}</p></section>`;
 }
 
-const views = { home, shop, cart, checkout, quality, blog, article, verify: verifyBatch, 'track-order': trackOrder, faq, contact, policy, document: documentPage, account };
+const views = { home, shop, reviews: reviewsPage, cart, checkout, quality, blog, article, verify: verifyBatch, 'track-order': trackOrder, faq, contact, policy, document: documentPage, account };
 
 function currentRoute() { return location.pathname.replace(/^\//, '').split('/')[0] || 'home'; }
 function applyTheme() {
@@ -1330,6 +1476,7 @@ let purchaseBarObserver = null;
 let purchaseBarFallbackCleanup = null;
 let purchaseBarState = { visible: false };
 let cartDrawerState = { open: false };
+let cartConfettiState = { played: false, timer: 0 };
 
 let heroRequest = 0;
 let heroObserver;
@@ -1512,10 +1659,18 @@ function refreshCommerceView() {
   const status = document.querySelector('main .commerce-status');
   if (status) status.innerHTML = commerceStatus();
   // Replace commerce UI only, retaining the gallery, hero, reviews and scroll position.
-  const commerceSelectors = route === 'home' ? ['.product-card-body'] : route === 'shop' && shopSection() === 'sachets' ? ['.sachet-products'] : route === 'shop' ? ['.purchase-panel', '.floating-purchase-actions', '.floating-product-summary'] : [];
+  const commerceSelectors = route === 'home' ? ['.product-card-body'] : route === 'shop' && shopSection() === 'sachets' ? [] : route === 'shop' ? ['.purchase-panel', '.floating-purchase-actions', '.floating-product-summary'] : [];
   for (const selector of commerceSelectors) {
     const existing = document.querySelectorAll('main ' + selector);
     template.content.querySelectorAll(selector).forEach((next, index) => existing[index]?.replaceWith(next));
+  }
+  if (route === 'shop' && shopSection() === 'sachets') {
+    const currentSection = document.querySelector('main .sachet-products');
+    const nextSection = template.content.querySelector('.sachet-products');
+    const currentControls = currentSection?.querySelectorAll('.sachet-cart-actions').length;
+    const nextControls = nextSection?.querySelectorAll('.sachet-cart-actions').length;
+    if (currentSection && nextSection && currentControls === nextControls) patchSachetQuantityControls();
+    else currentSection?.replaceWith(nextSection);
   }
   if (route === 'cart' || route === 'checkout') document.querySelector('main').innerHTML = template.innerHTML;
   const drawer = document.querySelector('.cart-drawer-body');
@@ -1581,7 +1736,19 @@ async function initCustomerAccount() {
     });
   }
 }
-function navigate(route) { history.pushState(null, '', route === 'home' ? '/' : `/${route}`); if (cartDrawerState.open) setCartDrawer(false, false); render(); if (commerce.loading && !commerce.busy) initCommerce(); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }
+function scrollToRouteTarget() {
+  if (!location.hash) return false;
+  const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  if (!target) return false;
+  target.scrollIntoView({ block: 'start', behavior: 'instant' });
+  return true;
+}
+
+function scrollReviewsCollection() {
+  document.getElementById('reviews-collection')?.scrollIntoView({ block: 'start', behavior: 'instant' });
+}
+
+function navigate(route) { history.pushState(null, '', route === 'home' ? '/' : `/${route}`); if (cartDrawerState.open) setCartDrawer(false, false); render(); if (commerce.loading && !commerce.busy) initCommerce(); if (!scrollToRouteTarget()) window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }
 
 function setSachetImageSlide(slider, requestedIndex) {
   const next = ((requestedIndex % 2) + 2) % 2;
@@ -1596,12 +1763,12 @@ document.addEventListener('click', event => {
   const link = event.target.closest('a[href]');
   if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
   const url = new URL(link.href, location.origin);
-  if (url.origin !== location.origin || url.hash || url.search) return;
+  if (url.origin !== location.origin || url.search) return;
   const route = url.pathname.replace(/^\//, '').replace(/\/$/, '') || 'home';
   if (!views[route.split('/')[0]]) return;
   if (cartDrawerState.open) setCartDrawer(false, false);
   event.preventDefault();
-  navigate(route);
+  navigate(route + url.hash);
 });
 
 function setMobileMenu(open) {
@@ -1696,32 +1863,35 @@ function bindEvents() {
     updatePeekRating(group, selected);
     group.querySelectorAll('input').forEach(input => {
       const item = input.closest('label');
-      item.addEventListener('pointerenter', event => {
-        if (event.pointerType !== 'touch') updatePeekRating(group, Number(input.value));
-      });
-      input.addEventListener('focus', () => updatePeekRating(group, Number(input.value)));
+      item.addEventListener('pointerenter', () => updatePeekRating(group, Number(input.value), true));
+      input.addEventListener('focus', () => updatePeekRating(group, Number(input.value), true));
       input.addEventListener('click', () => {
         selected = selected === Number(input.value) ? 0 : Number(input.value);
         group.querySelectorAll('input').forEach(radio => { radio.checked = Number(radio.value) === selected; });
-        updatePeekRating(group, selected);
+        updatePeekRating(group, selected, true);
         const star = item.querySelector('[aria-hidden]');
         if (selected && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
           star.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 320 });
         }
       });
     });
-    group.addEventListener('pointerleave', () => updatePeekRating(group, selected));
+    group.addEventListener('pointermove', event => {
+      const item = event.target.closest?.('label[data-rating]');
+      if (item) updatePeekRating(group, Number(item.dataset.rating), true);
+    });
+    group.addEventListener('pointerleave', () => updatePeekRating(group, selected, false));
     group.addEventListener('focusout', event => {
-      if (!group.contains(event.relatedTarget)) updatePeekRating(group, selected);
+      if (!group.contains(event.relatedTarget)) updatePeekRating(group, selected, false);
     });
   });
 }
 
-function updatePeekRating(group, value) {
+function updatePeekRating(group, value, reveal = false) {
   if (!group) return;
   const labels = ['Poor', 'Fair', 'Good', 'Great', 'Superb'];
   const tip = group.querySelector('.peek-rating-tip');
   if (tip) tip.textContent = value ? labels[value - 1] : 'Choose a rating';
+  group.classList.toggle('is-previewing', reveal);
   group.querySelectorAll('[data-rating]').forEach(item => {
     item.classList.toggle('is-previewed', Number(item.dataset.rating) <= value);
     item.classList.toggle('is-current', Number(item.dataset.rating) === value);
@@ -1755,7 +1925,7 @@ async function handleAction(action, element) {
   }
   if (action === 'change-pincode') {
     state.delivery = { pincode: '', status: 'idle', message: '' };
-    render();
+    if (!patchDeliverySummary()) render();
     document.querySelector('#summary-pincode')?.focus();
     return;
   }
@@ -1784,6 +1954,11 @@ async function handleAction(action, element) {
   if (action === 'show-coupon') { state.couponOpen = true; return render(); }
   if (action === 'hero-next') return setHeroSlide(state.heroSlide + 1);
   if (action === 'hero-prev') return setHeroSlide(state.heroSlide - 1);
+  if (action === 'reviews-page') {
+    state.reviewPage = Number(element.dataset.page) || 1;
+    if (renderReviewsPage()) scrollReviewsCollection();
+    return;
+  }
   if (action === 'reviews-prev' || action === 'reviews-next') {
     const showcase = element.closest('.product-reviews');
     const track = showcase?.querySelector('.review-card-track');
@@ -1856,13 +2031,13 @@ async function handleForm(event) {
     if (!/^\d{6}$/.test(pincode)) {
       state.delivery.status = 'error';
       state.delivery.message = 'Enter a valid 6-digit pincode.';
-      render();
+      if (!patchDeliverySummary()) render();
       document.querySelector('#delivery-pincode')?.focus();
       return;
     }
     state.delivery.status = 'checking';
     state.delivery.message = 'Checking delivery availability\u2026';
-    render();
+    if (!patchDeliverySummary()) render();
     try {
       const endpoint = window.AURA_SHIPPING_ENDPOINT || '/api/shipping/check';
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pincode, flavour: state.flavour, quantity: state.quantity, weight: 1, cod: true }) });
@@ -1876,7 +2051,7 @@ async function handleForm(event) {
         ? 'Pincode accepted. Delivery availability will be confirmed at checkout.'
         : error.message;
     }
-    render();
+    if (!patchDeliverySummary()) render();
     return;
   }
   if (form.dataset.form === 'review') {
@@ -1889,11 +2064,11 @@ async function handleForm(event) {
     const submit = form.querySelector('button[type="submit"]'); submit.disabled = true; result.textContent = 'Publishing your review...';
     try {
       const files = Array.from(form.elements.reviewImages.files || []);
-      if (files.length > 3) throw new Error('Choose no more than 3 product photos.');
+      if (files.length > 1) throw new Error('Choose one product photo.');
       if (files.length) result.textContent = 'Preparing and compressing your photos...';
-      const images = await Promise.all(files.map(compressReviewImage));
+      const images = files.length ? [await compressReviewImage(files[0])] : [];
       result.textContent = 'Publishing your review...';
-      const response = await fetch('/api/reviews', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ productHandle: SHOPIFY_CONFIG.products[state.flavour], displayName: name, rating, reviewText: text, website: form.elements.website.value, images }) });
+      const response = await fetch('/api/reviews', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ productHandle: reviewProductHandle(), displayName: name, rating, reviewText: text, website: form.elements.website.value, images }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || 'Unable to publish your review.');
       result.textContent = 'Thanks — your review is now live.';
@@ -1933,12 +2108,13 @@ async function handleForm(event) {
 window.addEventListener('popstate', () => {
   render();
   if (commerce.loading && !commerce.busy) initCommerce();
-  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  if (!scrollToRouteTarget()) window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 });
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => { render(); initCommerce(); initCustomerAccount(); });
+  document.addEventListener('DOMContentLoaded', () => { render(); initCommerce(); initCustomerAccount(); scrollToRouteTarget(); });
 } else {
   render();
   initCommerce();
   initCustomerAccount();
+  scrollToRouteTarget();
 }

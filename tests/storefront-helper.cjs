@@ -9,16 +9,16 @@ function storefront() {
   const notices = [];
   const redirects = [];
   const context = vm.createContext({
-    document: { querySelector: () => null, querySelectorAll: () => [], readyState: 'loading', addEventListener() {} },
+    document: { querySelector: () => null, querySelectorAll: () => [], getElementById: () => null, readyState: 'loading', addEventListener() {} },
     window: { scrollTo() {}, location: { assign: url => redirects.push(url) }, addEventListener(name, handler) { events[name] = handler; } },
     localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
-    location: { pathname: '/', origin: 'http://localhost' }, URL, AbortController, setTimeout, clearTimeout, Uint8Array,
+    location: { pathname: '/', hash: '', origin: 'http://localhost' }, URL, AbortController, setTimeout, clearTimeout, Uint8Array,
     crypto: require('node:crypto').webcrypto,
     btoa: value => Buffer.from(value, 'binary').toString('base64'),
     console: { warn: (...args) => notices.push(args.join(' ')) },
     fetch: () => { throw new Error('Unstubbed network call'); }
   });
-  context.history = { pushState: (_, unused, path) => { context.location.pathname = path; } };
+  context.history = { pushState: (_, unused, value) => { const url = new URL(value, context.location.origin); context.location.pathname = url.pathname; context.location.hash = url.hash; } };
   vm.runInContext(fs.readFileSync(path.join(root, 'shopify.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(root, 'batch-reports.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(root, 'app.js'), 'utf8'), context);
