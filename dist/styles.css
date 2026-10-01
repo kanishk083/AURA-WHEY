@@ -1507,6 +1507,8 @@ html[data-theme="light"] .product-page .button.primary:hover, html[data-theme="l
 .sachet-cart-qty .pack-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--gold) 42%, var(--surface)); }
 .sachet-cart-qty output { display: grid; place-items: center; color: var(--text); font: 800 .9rem/1 Montserrat, Arial, sans-serif; }
 .sachet-cart-actions > .button { width: 100%; min-height: 42px; }
+.sachet-card .button:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.sachet-card .button:disabled:hover { border-color: var(--gold); background: var(--gold); color: var(--ink); transform: none; box-shadow: none; }
 .floating-qty-group { display: flex; align-items: center; gap: .65rem; background: #fffdf8; color: var(--flavour-ink); border-radius: 10px; padding: .35rem; height: 100%; }
 .floating-qty-group .pack-btn { background: transparent; color: var(--flavour-ink); }
 .floating-qty-group .pack-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--flavour-ink) 10%, transparent); }

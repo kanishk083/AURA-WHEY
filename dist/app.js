@@ -194,6 +194,13 @@ function sachetCartQuantity(line) {
 }
 function sachetPrice(pack, flavour = state.sachetFlavour) { return formatMoney(sachetVariant(pack, flavour)?.price); }
 function sachetComparePrice(pack, flavour = state.sachetFlavour) { return formatMoney(sachetVariant(pack, flavour)?.compareAtPrice); }
+function sachetAvailability(variant) {
+  if (commerce.loading) return { state: 'loading', label: 'Checking availability\u2026' };
+  if (commerce.error) return { state: 'error', label: 'Unable to check availability' };
+  return variant?.availableForSale
+    ? { state: 'available', label: 'In stock' }
+    : { state: 'unavailable', label: 'Out of stock' };
+}
 function liveTitle(flavour = state.flavour) { return escapeHtml(commerce.products[flavour]?.title || 'Aura Whey ' + flavour); }
 function livePrice(flavour = state.flavour) { return formatMoney(selectedVariant(flavour)?.price); }
 function purchaseButton(action, label, className = '', iconName = '', flavour = state.flavour) {
@@ -1028,20 +1035,29 @@ function sachetCard(pack, title, description) {
   const flavour = pack === 'Duo Pack' ? 'Chocolate' : state.sachetFlavour;
   const flavourData = pack === 'Duo Pack' ? '' : ` data-flavour="${escapeHtml(flavour)}"`;
   const variant = sachetVariant(pack, flavour);
+  const availability = sachetAvailability(variant);
   const active = state.sachetPack === pack;
   const compare = variant?.compareAtPrice ? `<span class="sachet-compare">Compare-at <del>${sachetComparePrice(pack, flavour)}</del></span>` : '';
   const detail = pack === 'Single Sachet' ? '1 \u00D7 35g sachet' : pack === 'Duo Pack' ? '2 \u00D7 35g sachets' : '7 \u00D7 35g sachets';
-  const disabled = commerce.loading || commerce.busy || !commerce.cartReady || !variant?.availableForSale;
+  const disabled = availability.state !== 'available' || commerce.busy || !commerce.cartReady;
   const line = sachetCartLine(pack, flavour);
   const purchase = line
     ? `<div class="sachet-cart-actions">${sachetCartQuantity(line)}<button type="button" class="button primary" data-action="open-cart">Go to cart</button></div>`
     : `<button type="button" class="button primary" data-action="add-sachet" data-pack="${escapeHtml(pack)}"${flavourData} ${disabled ? 'disabled' : ''}>${commerce.busy ? 'Please wait\u2026' : 'Add to cart'}</button>`;
   description = description.replace(' plus one ', ' <span class="sachet-plus" aria-hidden="true">+</span> One ');
-  return `<article class="sachet-card ${active ? 'is-selected' : ''}"><div class="sachet-card-image" data-slide-index="0"><div class="sachet-card-track">${sachetMedia(pack, title)}</div><button type="button" class="sachet-slider-control sachet-slider-prev" data-action="sachet-image-prev" aria-label="Show previous ${escapeHtml(title)} image">${icon('arrowLeft')}</button><button type="button" class="sachet-slider-control sachet-slider-next" data-action="sachet-image-next" aria-label="Show next ${escapeHtml(title)} image">${icon('arrowRight')}</button><div class="sachet-slider-dots" aria-label="Product image position"><button type="button" class="active" data-action="sachet-image-slide" data-slide="0" aria-label="Show front image" aria-pressed="true"></button><button type="button" data-action="sachet-image-slide" data-slide="1" aria-label="Show back image" aria-pressed="false"></button></div></div><div class="sachet-card-body"><p class="hero-overline">${detail}</p><h2>${title}</h2><p>${description}</p><div class="sachet-card-facts"><span>35g</span><span>24g Protein</span><span>5.7g BCAAs</span></div>${sachetFlavourPicker(pack)}<div class="sachet-price"><strong>${sachetPrice(pack, flavour)}</strong>${compare}</div><p class="sachet-stock" role="status">${variant?.availableForSale ? 'In stock' : commerce.loading ? 'Checking availability\u2026' : 'Unavailable'}</p>${purchase}</div></article>`;
+  return `<article class="sachet-card ${active ? 'is-selected' : ''}"><div class="sachet-card-image" data-slide-index="0"><div class="sachet-card-track">${sachetMedia(pack, title)}</div><button type="button" class="sachet-slider-control sachet-slider-prev" data-action="sachet-image-prev" aria-label="Show previous ${escapeHtml(title)} image">${icon('arrowLeft')}</button><button type="button" class="sachet-slider-control sachet-slider-next" data-action="sachet-image-next" aria-label="Show next ${escapeHtml(title)} image">${icon('arrowRight')}</button><div class="sachet-slider-dots" aria-label="Product image position"><button type="button" class="active" data-action="sachet-image-slide" data-slide="0" aria-label="Show front image" aria-pressed="true"></button><button type="button" data-action="sachet-image-slide" data-slide="1" aria-label="Show back image" aria-pressed="false"></button></div></div><div class="sachet-card-body"><p class="hero-overline">${detail}</p><h2>${title}</h2><p>${description}</p><div class="sachet-card-facts"><span>35g</span><span>24g Protein</span><span>5.7g BCAAs</span></div>${sachetFlavourPicker(pack)}<div class="sachet-price"><strong>${sachetPrice(pack, flavour)}</strong>${compare}</div><p class="sachet-stock" data-availability="${availability.state}" role="status">${availability.label}</p>${purchase}</div></article>`;
+}
+
+function sachetProductsNeedReplacement(currentSection, nextSection) {
+  if (!currentSection || !nextSection) return true;
+  const currentControls = currentSection.querySelectorAll('.sachet-cart-actions').length;
+  const nextControls = nextSection.querySelectorAll('.sachet-cart-actions').length;
+  return currentSection.dataset.commerceState !== nextSection.dataset.commerceState || currentControls !== nextControls;
 }
 
 function sachetsShop() {
-  return `<div class="sachet-shop"><div class="commerce-status">${commerceStatus()}</div><section class="sachet-hero"><div><p class="hero-overline">Protein that travels</p><h1>Aura Whey Protein Sachets</h1><p>24g protein and 5.7g BCAAs in every 35g sachet. Choose a single, a fixed flavour duo, or a seven-sachet travel pack.</p><span class="sachet-delivery">Free delivery on Sachet orders</span></div><div class="sachet-hero-visual">${image(sachetAssets.productInfo, 'Aura Whey Sachet front and back with Rich Chocolate and Mawa Kulfi', 'sachet-hero-image')}</div></section><section class="section sachet-products" aria-labelledby="sachet-products-title"><div class="section-inner"><div class="section-head"><div><p class="hero-overline">Choose your pack</p><h2 id="sachet-products-title">Built for one shake or the whole week.</h2><div class="gold-rule"></div></div><p>Rich Chocolate or Mawa Kulfi. Prices and availability come directly from Shopify.</p></div><div class="sachet-grid">${sachetCard('Single Sachet', 'Single Sachet', 'Choose Rich Chocolate or Mawa Kulfi.')}${sachetCard('Duo Pack', 'Duo Pack', 'One Rich Chocolate plus one Mawa Kulfi sachet.')}${sachetCard('Travel Pack (7 Sachets)', 'Travel Pack \u2014 7 Sachets', 'Seven sachets in your chosen flavour.')}</div></div></section><section class="section sachet-facts"><div class="section-inner"><div><strong>35g</strong><span>Per sachet</span></div><div><strong>24g</strong><span>Protein</span></div><div><strong>5.7g</strong><span>BCAAs</span></div><div><strong>2</strong><span>Rich Chocolate + Mawa Kulfi</span></div></div></section>${reviewShowcase('product', reviewData.product || approvedReviews)}${storeFaq()}</div>`;
+  const commerceState = commerce.loading ? 'loading' : commerce.error ? 'error' : 'ready';
+  return `<div class="sachet-shop"><div class="commerce-status">${commerceStatus()}</div><section class="sachet-hero"><div><p class="hero-overline">Protein that travels</p><h1>Aura Whey Protein Sachets</h1><p>24g protein and 5.7g BCAAs in every 35g sachet. Choose a single, a fixed flavour duo, or a seven-sachet travel pack.</p><span class="sachet-delivery">Free delivery on Sachet orders</span></div><div class="sachet-hero-visual">${image(sachetAssets.productInfo, 'Aura Whey Sachet front and back with Rich Chocolate and Mawa Kulfi', 'sachet-hero-image')}</div></section><section class="section sachet-products" data-commerce-state="${commerceState}" aria-labelledby="sachet-products-title"><div class="section-inner"><div class="section-head"><div><p class="hero-overline">Choose your pack</p><h2 id="sachet-products-title">Built for one shake or the whole week.</h2><div class="gold-rule"></div></div><p>Rich Chocolate or Mawa Kulfi. Prices and availability come directly from Shopify.</p></div><div class="sachet-grid">${sachetCard('Single Sachet', 'Single Sachet', 'Choose Rich Chocolate or Mawa Kulfi.')}${sachetCard('Duo Pack', 'Duo Pack', 'One Rich Chocolate plus one Mawa Kulfi sachet.')}${sachetCard('Travel Pack (7 Sachets)', 'Travel Pack \u2014 7 Sachets', 'Seven sachets in your chosen flavour.')}</div></div></section><section class="section sachet-facts"><div class="section-inner"><div><strong>35g</strong><span>Per sachet</span></div><div><strong>24g</strong><span>Protein</span></div><div><strong>5.7g</strong><span>BCAAs</span></div><div><strong>2</strong><span>Rich Chocolate + Mawa Kulfi</span></div></div></section>${reviewShowcase('product', reviewData.product || approvedReviews)}${storeFaq()}</div>`;
 }
 
 function auraQuantity() {
@@ -1674,10 +1690,8 @@ function refreshCommerceView() {
   if (route === 'shop' && shopSection() === 'sachets') {
     const currentSection = document.querySelector('main .sachet-products');
     const nextSection = template.content.querySelector('.sachet-products');
-    const currentControls = currentSection?.querySelectorAll('.sachet-cart-actions').length;
-    const nextControls = nextSection?.querySelectorAll('.sachet-cart-actions').length;
-    if (currentSection && nextSection && currentControls === nextControls) patchSachetQuantityControls();
-    else currentSection?.replaceWith(nextSection);
+    if (sachetProductsNeedReplacement(currentSection, nextSection)) currentSection?.replaceWith(nextSection);
+    else patchSachetQuantityControls();
   }
   if (route === 'cart' || route === 'checkout') document.querySelector('main').innerHTML = template.innerHTML;
   const drawer = document.querySelector('.cart-drawer-body');

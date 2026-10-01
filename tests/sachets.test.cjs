@@ -87,8 +87,100 @@ test('Shopify availability blocks Sachet cart mutation', async () => {
   await run("addSachetProduct('Single Sachet', 'Chocolate')");
   assert.equal(run('state.cart'), 0);
   const card = run("sachetCard('Single Sachet', 'Single Sachet', 'Choose a flavour')");
-  assert.match(card, /Unavailable/);
+  assert.match(card, /Out of stock/);
   assert.match(card, /disabled/);
+});
+
+test('direct Sachets load stays disabled until Shopify availability resolves', async () => {
+  const { context, run } = storefront();
+  context.location.pathname = '/shop/sachets';
+  run("savedSachetProduct = commerce.products.Sachets; commerce.products = {}; commerce.loading = true; commerce.cartReady = false; commerce.error = ''");
+  const loading = run('shop()');
+  assert.match(loading, /data-commerce-state="loading"/);
+  assert.equal((loading.match(/Checking availability/g) || []).length, 3);
+  assert.equal((loading.match(/data-action="add-sachet"[^>]*disabled/g) || []).length, 3);
+  await run("addSachetProduct('Single Sachet', 'Chocolate')");
+  assert.equal(run('state.cart'), 0, 'an unresolved variant cannot bypass the disabled button');
+
+  run("commerce.products.Sachets = savedSachetProduct; commerce.loading = false; commerce.cartReady = true");
+  const ready = run('shop()');
+  assert.match(ready, /data-commerce-state="ready"/);
+  assert.equal((ready.match(/data-availability="available"[^>]*>In stock/g) || []).length, 3);
+  assert.equal((ready.match(/data-action="add-sachet"[^>]*disabled/g) || []).length, 0);
+  for (const price of ['\u20b9149.00', '\u20b9270.00', '\u20b9875.00', '\u20b9199.00', '\u20b9398.00', '\u20b91,393.00']) assert.match(ready, new RegExp(price));
+});
+
+test('Sachet availability renders explicit unavailable and Shopify error states safely', () => {
+  const { context, run } = storefront();
+  context.location.pathname = '/shop/sachets';
+  run("sachetVariant('Single Sachet', 'Chocolate').availableForSale = false");
+  const unavailable = run("sachetCard('Single Sachet', 'Single Sachet', 'Choose a flavour')");
+  assert.match(unavailable, /data-availability="unavailable"[^>]*>Out of stock/);
+  assert.match(unavailable, /data-action="add-sachet"[^>]*disabled/);
+
+  run("commerce.products = {}; commerce.loading = false; commerce.cartReady = false; commerce.error = 'Storefront unavailable'");
+  const failed = run('shop()');
+  assert.match(failed, /data-commerce-state="error"/);
+  assert.equal((failed.match(/Unable to check availability/g) || []).length, 3);
+  assert.equal((failed.match(/data-action="add-sachet"[^>]*disabled/g) || []).length, 3);
+  assert.match(failed, /data-action="retry-shopify"/);
+});
+
+test('Shopify hydration replaces stale direct-load Sachet markup before quantity-only patching', () => {
+  const { run } = storefront();
+  const section = (state, controls = 0) => ({ dataset: { commerceState: state }, querySelectorAll: () => Array(controls) });
+  const loading = section('loading');
+  const ready = section('ready');
+  const failed = section('error');
+  assert.equal(run('sachetProductsNeedReplacement')(loading, ready), true);
+  assert.equal(run('sachetProductsNeedReplacement')(loading, failed), true);
+  assert.equal(run('sachetProductsNeedReplacement')(ready, section('ready')), false);
+  assert.equal(run('sachetProductsNeedReplacement')(ready, section('ready', 1)), true);
+});
+
+test('all Sachet pack and flavour choices resolve their authoritative Shopify variants', () => {
+  const { run } = storefront();
+  const choices = run(`[
+    ['Single Sachet', 'Chocolate'], ['Single Sachet', 'Mawa Kulfi'],
+    ['Duo Pack', 'Chocolate'], ['Duo Pack', 'Mawa Kulfi'],
+    ['Travel Pack (7 Sachets)', 'Chocolate'], ['Travel Pack (7 Sachets)', 'Mawa Kulfi']
+  ].map(([pack, flavour]) => ({ pack, flavour, id: sachetVariant(pack, flavour)?.id, available: sachetVariant(pack, flavour)?.availableForSale }))`);
+  assert.deepEqual(JSON.parse(JSON.stringify(choices)), [
+    { pack: 'Single Sachet', flavour: 'Chocolate', id: 'variant-sachet-single-chocolate', available: true },
+    { pack: 'Single Sachet', flavour: 'Mawa Kulfi', id: 'variant-sachet-single-mawa', available: true },
+    { pack: 'Duo Pack', flavour: 'Chocolate', id: 'variant-sachet-duo-chocolate', available: true },
+    { pack: 'Duo Pack', flavour: 'Mawa Kulfi', id: 'variant-sachet-duo-chocolate', available: true },
+    { pack: 'Travel Pack (7 Sachets)', flavour: 'Chocolate', id: 'variant-sachet-travel-chocolate', available: true },
+    { pack: 'Travel Pack (7 Sachets)', flavour: 'Mawa Kulfi', id: 'variant-sachet-travel-mawa', available: true }
+  ]);
+});
+
+test('direct load, hard refresh and SPA navigation converge to the same Sachet state', () => {
+  const renderDirect = () => {
+    const fixture = storefront();
+    fixture.context.location.pathname = '/shop/sachets';
+    return fixture.run('shop()');
+  };
+  const direct = renderDirect();
+  const refreshed = renderDirect();
+  const spa = storefront();
+  spa.run("navigate('shop/sachets')");
+  const navigated = spa.run('shop()');
+  const state = markup => ({
+    ready: (markup.match(/data-commerce-state="ready"/g) || []).length,
+    available: (markup.match(/data-availability="available"[^>]*>In stock/g) || []).length,
+    enabled: (markup.match(/data-action="add-sachet"(?![^>]*disabled)/g) || []).length,
+    prices: ['\u20b9149.00', '\u20b9270.00', '\u20b9875.00'].map(price => markup.includes(price))
+  });
+  assert.deepEqual(state(direct), state(refreshed));
+  assert.deepEqual(state(direct), state(navigated));
+  assert.deepEqual(state(direct), { ready: 1, available: 3, enabled: 3, prices: [true, true, true] });
+});
+
+test('Sachet disabled state is visually distinct while availability is unresolved', () => {
+  const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(css, /\.sachet-card \.button:disabled\s*\{[^}]*opacity:\s*\.45[^}]*cursor:\s*not-allowed/);
+  assert.match(css, /\.sachet-card \.button:disabled:hover\s*\{[^}]*transform:\s*none/);
 });
 
 test('Storefront query requests compare-at prices and no Rewards system is introduced', () => {
