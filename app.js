@@ -125,7 +125,7 @@ const state = {
   sachetPack: null, sachetFlavour: 'Chocolate',
   couponOpen: true, searchQuery: '', heroSlide: 0, theme: localStorage.getItem('aura-theme') || 'dark',
   delivery: { pincode: '', status: 'idle', message: '' },
-  document: 'FSSAI licence', auraDownStreak: 0
+  document: 'FSSAI licence', auraDownStreak: 0, reviewPage: 1
 };
 const customerAccount = { loading: true, authenticated: false, customer: null, error: '' };
 
@@ -782,10 +782,15 @@ function approvedReviewCards(reviews = approvedReviews, scope = 'product', optio
   const className = scope === 'product' ? 'review-card-track' : 'review-card-grid';
   const label = scope === 'product' ? `Customer reviews for ${reviewProductLabel()}` : 'Customer reviews for all Aura Whey flavours';
   const limited = scope === 'home' && options.limit !== false;
-  const displayed = limited ? visible.slice(0, 3) : visible;
+  const paginated = scope === 'home' && options.paginate === true;
+  const pageSize = 7;
+  const pageCount = paginated ? Math.ceil(visible.length / pageSize) : 1;
+  const currentPage = paginated ? Math.min(Math.max(Number(options.page) || 1, 1), pageCount) : 1;
+  const displayed = paginated ? visible.slice((currentPage - 1) * pageSize, currentPage * pageSize) : limited ? visible.slice(0, 3) : visible;
   const cards = displayed.map(review => reviewCard(review, { showDate: scope === 'home' || options.showDate })).join('');
   const more = limited && options.showMore !== false && visible.length > 3 ? routeLink('reviews', 'View more reviews', 'button-link secondary review-view-more') : '';
-  return `<div class="${className}" aria-label="${escapeHtml(label)}">${cards}</div>${more}`;
+  const pagination = paginated && pageCount > 1 ? `<nav class="review-pagination" aria-label="Reviews pages"><button type="button" class="button" data-action="reviews-page" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>Previous</button><div class="review-page-numbers">${Array.from({ length: pageCount }, (_, index) => index + 1).map(page => `<button type="button" class="button${page === currentPage ? ' active' : ''}" data-action="reviews-page" data-page="${page}" aria-label="Go to reviews page ${page}"${page === currentPage ? ' aria-current="page"' : ''}>${page}</button>`).join('')}</div><button type="button" class="button" data-action="reviews-page" data-page="${currentPage + 1}" ${currentPage === pageCount ? 'disabled' : ''}>Next</button></nav>` : '';
+  return `<div class="${className}" aria-label="${escapeHtml(label)}">${cards}</div>${pagination}${more}`;
 }
 
 function reviewShowcase(scope = 'home', reviews = approvedReviews, options = {}) {
@@ -800,7 +805,15 @@ function reviewShowcase(scope = 'home', reviews = approvedReviews, options = {})
 }
 
 function reviewsPage() {
-  return `<section class="page-intro compact"><p class="hero-overline">The full collection</p><h1>Every routine has a story.</h1><p>Read what the Aura Whey community has shared across Mawa Kulfi, Rich Chocolate, and 35g Sachets.</p></section>${reviewShowcase('home', reviewData.home || approvedReviews, { limit: false, showMore: false, showDate: true })}`;
+  return `<section class="page-intro compact"><p class="hero-overline">The full collection</p><h1>Every routine has a story.</h1><p>Read what the Aura Whey community has shared across Mawa Kulfi, Rich Chocolate, and 35g Sachets.</p></section>${reviewShowcase('home', reviewData.home || approvedReviews, { paginate: true, page: state.reviewPage, showMore: false, showDate: true })}`;
+}
+
+function renderReviewsPage() {
+  const section = document.querySelector('[data-review-scope="home"]');
+  if (!section || !reviewData.home) return false;
+  section.querySelector('.review-board').innerHTML = approvedReviewCards(reviewData.home, 'home', { paginate: true, page: state.reviewPage, showMore: false, showDate: true });
+  bindReviewInteractions(section);
+  return true;
 }
 
 
@@ -859,7 +872,7 @@ async function loadReviews(scope = 'product') {
   }
   if (section) {
     const fullReviewsPage = currentRoute() === 'reviews';
-    const options = { limit: !fullReviewsPage, showMore: !fullReviewsPage, showDate: true };
+    const options = fullReviewsPage ? { paginate: true, page: state.reviewPage, showMore: false, showDate: true } : { limit: true, showMore: true, showDate: true };
     section.querySelector('.review-board').innerHTML = approvedReviewCards(reviewData[scope], scope, options);
     bindReviewInteractions(section);
   }
@@ -1928,6 +1941,10 @@ async function handleAction(action, element) {
   if (action === 'show-coupon') { state.couponOpen = true; return render(); }
   if (action === 'hero-next') return setHeroSlide(state.heroSlide + 1);
   if (action === 'hero-prev') return setHeroSlide(state.heroSlide - 1);
+  if (action === 'reviews-page') {
+    state.reviewPage = Number(element.dataset.page) || 1;
+    return renderReviewsPage();
+  }
   if (action === 'reviews-prev' || action === 'reviews-next') {
     const showcase = element.closest('.product-reviews');
     const track = showcase?.querySelector('.review-card-track');
