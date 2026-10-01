@@ -70,7 +70,7 @@ function inspectCouriers(payload) {
 
   const blockedCount = couriers.filter(courier => Boolean(courier?.blocked)).length;
   const pickupUnavailableCount = couriers.filter(courier => String(courier?.pickup_availability) === '0').length;
-  const eligible = couriers.filter(courier => courier && !courier.blocked && String(courier.pickup_availability) !== '0');
+  const eligible = couriers.filter(courier => courier && !courier.blocked);
   const courier = eligible.sort((a, b) => {
     const aDays = Number(a.estimated_delivery_days) || Number.POSITIVE_INFINITY;
     const bDays = Number(b.estimated_delivery_days) || Number.POSITIVE_INFINITY;

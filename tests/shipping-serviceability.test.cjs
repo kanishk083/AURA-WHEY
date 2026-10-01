@@ -119,7 +119,7 @@ test('diagnostics contain aggregates but no token, credentials, authorization or
   assert.doesNotMatch(serialized, /token-marker|Authorization|401203|postcode/);
 });
 
-test('pickup availability normalizes documented string and numeric values without changing eligibility', async t => {
+test('pickup availability is diagnostic and does not reject serviceable couriers', async t => {
   const result = await invoke(t, jsonResponse(200, { data: { available_courier_companies: [
     { courier_name: 'String zero', blocked: false, pickup_availability: '0' },
     { courier_name: 'Numeric zero', blocked: false, pickup_availability: 0 },
@@ -131,9 +131,21 @@ test('pickup availability normalizes documented string and numeric values withou
   assert.equal(result.body.status, 'serviceable');
   const diagnostic = result.logs[0][1];
   assert.equal(diagnostic.pickupUnavailableCount, 2);
-  assert.equal(diagnostic.eligibleCourierCount, 3);
+  assert.equal(diagnostic.eligibleCourierCount, 5);
   assert.equal(diagnostic.pickupConfigSource, 'default');
   assert.equal(diagnostic.pickupConfigured, false);
+});
+
+test('a valid unblocked courier remains serviceable when pickup availability is zero', async t => {
+  const result = await invoke(t, jsonResponse(200, { data: { available_courier_companies: [{
+    courier_name: 'Prepaid Courier', blocked: 0, pickup_availability: '0', estimated_delivery_days: '3', cod: 0,
+  }] } }));
+  assert.equal(result.status, 200);
+  assert.equal(result.body.status, 'serviceable');
+  assert.equal(result.body.available, true);
+  assert.equal(result.body.codAvailable, false);
+  assert.equal(result.logs[0][1].pickupUnavailableCount, 1);
+  assert.equal(result.logs[0][1].eligibleCourierCount, 1);
 });
 
 test('six-digit India pincode validation remains enforced before any network request', async t => {
