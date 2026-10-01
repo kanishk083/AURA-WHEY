@@ -314,9 +314,9 @@ function appliedCoupons() {
 function deliveryPincodeCard() {
   const { pincode, status, message } = state.delivery;
   const saved = Boolean(pincode);
-  const result = status === 'ready'
+  const result = status === 'serviceable'
     ? `<p class="delivery-result is-ready" role="status">${escapeHtml(message)}</p>`
-    : status === 'error' || status === 'unavailable'
+    : status === 'error' || status === 'unserviceable'
       ? `<p class="delivery-result is-error" role="alert">${escapeHtml(message)}</p>`
       : saved ? `<p class="delivery-result" role="status">${escapeHtml(message || 'Pincode saved.')}</p>` : '';
   return `<section class="summary-card" data-delivery-summary><h3 class="summary-card-title">Enter delivery pincode</h3>${saved ? `<div class="pincode-saved"><span class="pincode-mark" aria-hidden="true">${icon('mapPin')}</span><div class="pincode-details"><span class="pincode-caption">Delivering to</span><span class="pincode-value">${escapeHtml(pincode)}</span></div><button type="button" class="pincode-change" data-action="change-pincode">Change</button>${result}</div>` : `<div class="inline-action-row"><input id="summary-pincode" name="summary-pincode" inputmode="numeric" autocomplete="postal-code" maxlength="6" placeholder="Enter pincode here" aria-label="Enter delivery pincode" /><button type="button" class="button" data-action="check-pincode">Check</button></div><p class="summary-card-note">Enter your pincode to check delivery availability.</p>`}</section>`;
@@ -683,9 +683,11 @@ function productInside() {
 function deliveryOptions() {
   const result = state.delivery.status === 'error'
     ? `<p class="delivery-result is-error" id="delivery-result" role="alert">${escapeHtml(state.delivery.message)}</p>`
-    : state.delivery.status === 'ready'
+    : state.delivery.status === 'serviceable'
       ? `<p class="delivery-result is-ready" id="delivery-result" role="status">${escapeHtml(state.delivery.message)}</p>`
-      : `<p class="delivery-result" id="delivery-result" role="status">${escapeHtml(state.delivery.message || 'Enter your pincode to check delivery availability.')}</p>`;
+      : state.delivery.status === 'unserviceable'
+        ? `<p class="delivery-result is-error" id="delivery-result" role="status">${escapeHtml(state.delivery.message)}</p>`
+        : `<p class="delivery-result" id="delivery-result" role="status">${escapeHtml(state.delivery.message || 'Enter your pincode to check delivery availability.')}</p>`;
   return `<section class="delivery-options" aria-labelledby="delivery-options-title"><h3 id="delivery-options-title">${icon('mapPin')} Delivery options</h3><form class="delivery-check-form" data-form="delivery-check"><label class="sr-only" for="delivery-pincode">Delivery pincode</label><div class="inline-action-row"><input id="delivery-pincode" name="pincode" inputmode="numeric" autocomplete="postal-code" maxlength="6" pattern="[0-9]{6}" value="${escapeHtml(state.delivery.pincode)}" placeholder="Enter pincode" required /><button type="submit" class="button" ${commerce.busy ? 'disabled' : ''}>Check</button></div></form>${result}<ul class="delivery-promises"><li>${icon('truck')}<span>Free shipping on orders above \u20b92,000</span></li><li>${icon('refresh')}<a href="/policy" data-route="policy">Replacement and cancellation policy</a></li></ul></section>`;
 }
 
@@ -2064,16 +2066,21 @@ async function handleForm(event) {
     if (!patchDeliverySummary()) render();
     try {
       const endpoint = window.AURA_SHIPPING_ENDPOINT || '/api/shipping/check';
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pincode, flavour: state.flavour, quantity: state.quantity, weight: 1, cod: true }) });
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pincode, flavour: state.flavour, quantity: state.quantity, weight: 1 }) });
       const result = await response.json();
-      if (!response.ok || !result.available) throw new Error(result.message || 'Delivery is not available for this pincode.');
-      state.delivery.status = 'ready';
-      state.delivery.message = result.message || `Delivery available${result.eta ? ` · Estimated delivery ${result.eta}` : ''}.`;
-    } catch (error) {
-      state.delivery.status = 'unavailable';
-      state.delivery.message = error.message === 'Shipping endpoint is not configured.'
-        ? 'Pincode accepted. Delivery availability will be confirmed at checkout.'
-        : error.message;
+      if (!response.ok || result.status === 'error') throw new Error('serviceability_error');
+      if (result.status === 'serviceable' && result.available === true) {
+        state.delivery.status = 'serviceable';
+        state.delivery.message = result.message || `Delivery available${result.eta ? ` · Estimated delivery ${result.eta}` : ''}.`;
+      } else if (result.status === 'unserviceable' && result.available === false) {
+        state.delivery.status = 'unserviceable';
+        state.delivery.message = 'Delivery is not available for this pincode.';
+      } else {
+        throw new Error('invalid_serviceability_response');
+      }
+    } catch {
+      state.delivery.status = 'error';
+      state.delivery.message = 'Unable to check delivery availability right now. Please try again.';
     }
     if (!patchDeliverySummary()) render();
     return;
