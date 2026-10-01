@@ -28,6 +28,18 @@ function payloadIssue(payload) {
   return null;
 }
 
+function safeCourierDiagnostic(courier) {
+  if (!courier || typeof courier !== 'object' || Array.isArray(courier)) return null;
+  const diagnostic = {};
+  const safeFields = ['courier_name', 'courier_company_id', 'pickup_availability', 'blocked', 'rate', 'etd', 'estimated_delivery_days'];
+  for (const field of safeFields) {
+    const value = courier[field];
+    if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) diagnostic[field] = value;
+  }
+  diagnostic.pickupAvailabilityType = courier.pickup_availability === null ? 'null' : typeof courier.pickup_availability;
+  return diagnostic;
+}
+
 async function shiprocketToken() {
   if (cachedToken && Date.now() < cachedTokenExpiresAt) return cachedToken;
   const email = process.env.SHIPROCKET_API_EMAIL;
@@ -64,7 +76,15 @@ function inspectCouriers(payload) {
     const bDays = Number(b.estimated_delivery_days) || Number.POSITIVE_INFINITY;
     return aDays - bDays;
   })[0] || null;
-  return { courier, courierCompaniesType, courierCompaniesCount: couriers.length, eligibleCourierCount: eligible.length, blockedCount, pickupUnavailableCount };
+  return {
+    courier,
+    courierCompaniesType,
+    courierCompaniesCount: couriers.length,
+    eligibleCourierCount: eligible.length,
+    blockedCount,
+    pickupUnavailableCount,
+    courierDiagnostics: couriers.map(safeCourierDiagnostic).filter(Boolean),
+  };
 }
 
 export default async function handler(request, response) {
@@ -78,6 +98,8 @@ export default async function handler(request, response) {
   const deliveryPostcode = String(input.pincode || '').trim();
   if (!/^\d{6}$/.test(deliveryPostcode)) return send(response, { status: 'error', available: null, message: 'Enter a valid 6-digit pincode.' }, 400);
 
+  const pickupConfigured = Boolean(String(process.env.SHIPROCKET_PICKUP_POSTCODE || '').trim());
+  const pickupConfigSource = pickupConfigured ? 'SHIPROCKET_PICKUP_POSTCODE' : 'default';
   const pickupPostcode = String(process.env.SHIPROCKET_PICKUP_POSTCODE || '410221');
   const quantity = Math.max(1, Math.min(20, Number(input.quantity) || 1));
   const packageWeight = Number(process.env.SHIPROCKET_WEIGHT_KG || '2.4');
@@ -111,6 +133,9 @@ export default async function handler(request, response) {
       eligibleCourierCount: inspection.eligibleCourierCount ?? null,
       blockedCount: inspection.blockedCount ?? null,
       pickupUnavailableCount: inspection.pickupUnavailableCount ?? null,
+      pickupConfigSource,
+      pickupConfigured,
+      courierDiagnostics: inspection.courierDiagnostics || [],
       upstreamStatusCode: typeof payload?.status_code === 'number' ? payload.status_code : null,
       upstreamMessage: safeText(payload?.message),
       upstreamError: safeText(payload?.error),

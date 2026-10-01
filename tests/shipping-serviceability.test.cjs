@@ -13,10 +13,13 @@ async function invoke(t, serviceability, options = {}) {
   const originalFetch = global.fetch;
   const originalEmail = process.env.SHIPROCKET_API_EMAIL;
   const originalPassword = process.env.SHIPROCKET_API_PASSWORD;
+  const originalPickupPostcode = process.env.SHIPROCKET_PICKUP_POSTCODE;
   const originalInfo = console.info;
   const originalError = console.error;
   process.env.SHIPROCKET_API_EMAIL = 'x';
   process.env.SHIPROCKET_API_PASSWORD = 'y';
+  if (options.pickupConfigured) process.env.SHIPROCKET_PICKUP_POSTCODE = '123456';
+  else delete process.env.SHIPROCKET_PICKUP_POSTCODE;
   const requests = [];
   const logs = [];
   global.fetch = async (url, init = {}) => {
@@ -33,6 +36,7 @@ async function invoke(t, serviceability, options = {}) {
     console.error = originalError;
     if (originalEmail === undefined) delete process.env.SHIPROCKET_API_EMAIL; else process.env.SHIPROCKET_API_EMAIL = originalEmail;
     if (originalPassword === undefined) delete process.env.SHIPROCKET_API_PASSWORD; else process.env.SHIPROCKET_API_PASSWORD = originalPassword;
+    if (originalPickupPostcode === undefined) delete process.env.SHIPROCKET_PICKUP_POSTCODE; else process.env.SHIPROCKET_PICKUP_POSTCODE = originalPickupPostcode;
   });
   const { default: handler } = await import(`${moduleUrl}?test=${Date.now()}-${Math.random()}`);
   const output = {};
@@ -101,11 +105,35 @@ test('network failure returns a safe error', async t => {
 });
 
 test('diagnostics contain aggregates but no token, credentials, authorization or pincode', async t => {
-  const result = await invoke(t, jsonResponse(200, { data: { available_courier_companies: [{ blocked: true, pickup_availability: '0' }] } }));
+  const result = await invoke(t, jsonResponse(200, { data: { available_courier_companies: [{
+    courier_name: 'Safe Courier', courier_company_id: 42, pickup_availability: '0', blocked: false,
+    rate: 91.5, etd: 'Oct 03, 2026', estimated_delivery_days: '2', postcode: '401203',
+  }] } }), { pickupConfigured: true });
   const serialized = JSON.stringify(result.logs);
   assert.match(serialized, /courierCompaniesCount/);
   assert.match(serialized, /eligibleCourierCount/);
-  assert.doesNotMatch(serialized, /token-marker|Authorization|401203/);
+  assert.match(serialized, /"pickup_availability":"0"/);
+  assert.match(serialized, /"pickupAvailabilityType":"string"/);
+  assert.match(serialized, /"pickupConfigSource":"SHIPROCKET_PICKUP_POSTCODE"/);
+  assert.match(serialized, /"pickupConfigured":true/);
+  assert.doesNotMatch(serialized, /token-marker|Authorization|401203|postcode/);
+});
+
+test('pickup availability normalizes documented string and numeric values without changing eligibility', async t => {
+  const result = await invoke(t, jsonResponse(200, { data: { available_courier_companies: [
+    { courier_name: 'String zero', blocked: false, pickup_availability: '0' },
+    { courier_name: 'Numeric zero', blocked: false, pickup_availability: 0 },
+    { courier_name: 'String one', blocked: false, pickup_availability: '1', estimated_delivery_days: 2 },
+    { courier_name: 'Numeric one', blocked: false, pickup_availability: 1, estimated_delivery_days: 3 },
+    { courier_name: 'Boolean true', blocked: false, pickup_availability: true, estimated_delivery_days: 4 },
+  ] } }));
+  assert.equal(result.status, 200);
+  assert.equal(result.body.status, 'serviceable');
+  const diagnostic = result.logs[0][1];
+  assert.equal(diagnostic.pickupUnavailableCount, 2);
+  assert.equal(diagnostic.eligibleCourierCount, 3);
+  assert.equal(diagnostic.pickupConfigSource, 'default');
+  assert.equal(diagnostic.pickupConfigured, false);
 });
 
 test('six-digit India pincode validation remains enforced before any network request', async t => {
