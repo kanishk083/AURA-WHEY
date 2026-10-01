@@ -587,6 +587,11 @@ main { width: 100%; padding-top: calc(var(--banner-h) + var(--header-h)); overfl
 .review-love-header > p:last-child { max-width: 48ch; color: var(--muted); font-size: clamp(1rem, 1.5vw, 1.2rem); line-height: 1.65; }
 .review-board { display: grid; gap: 1rem; }
 .review-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.review-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .75rem; margin-top: 2rem; }
+.review-page-numbers { display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem; }
+.review-pagination .button { min-width: 2.5rem; min-height: 2.5rem; padding: .5rem .7rem; }
+.review-pagination .button.active { border-color: var(--gold); background: var(--gold); color: var(--ink); }
+.review-pagination .button:disabled { opacity: .4; cursor: default; }
 .review-card { position: relative; min-height: 16rem; display: flex; flex-direction: column; align-items: flex-start; padding: 1.35rem; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); box-shadow: 0 22px 50px -40px rgba(0,0,0,.85); }
 .review-card::after { content: "♡"; position: absolute; right: .8rem; bottom: -.5rem; color: color-mix(in srgb, var(--soft) 9%, transparent); font: 800 6rem/1 Montserrat, sans-serif; pointer-events: none; }
 .review-card-top { display: flex; align-items: center; gap: .75rem; }
