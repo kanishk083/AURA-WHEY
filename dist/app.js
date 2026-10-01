@@ -195,7 +195,7 @@ function sachetCartQuantity(line) {
 function sachetPrice(pack, flavour = state.sachetFlavour) { return formatMoney(sachetVariant(pack, flavour)?.price); }
 function sachetComparePrice(pack, flavour = state.sachetFlavour) { return formatMoney(sachetVariant(pack, flavour)?.compareAtPrice); }
 function sachetAvailability(variant) {
-  if (commerce.loading) return { state: 'loading', label: 'Checking availability\u2026' };
+  if (commerce.loading) return { state: 'loading', label: '' };
   if (commerce.error) return { state: 'error', label: 'Unable to check availability' };
   return variant?.availableForSale
     ? { state: 'available', label: 'In stock' }
@@ -1036,6 +1036,8 @@ function sachetCard(pack, title, description) {
   const flavourData = pack === 'Duo Pack' ? '' : ` data-flavour="${escapeHtml(flavour)}"`;
   const variant = sachetVariant(pack, flavour);
   const availability = sachetAvailability(variant);
+  const unresolved = availability.state === 'loading' || availability.state === 'error';
+  const availabilityAttributes = availability.state === 'loading' ? 'aria-hidden="true"' : 'role="status"';
   const active = state.sachetPack === pack;
   const compare = variant?.compareAtPrice ? `<span class="sachet-compare">Compare-at <del>${sachetComparePrice(pack, flavour)}</del></span>` : '';
   const detail = pack === 'Single Sachet' ? '1 \u00D7 35g sachet' : pack === 'Duo Pack' ? '2 \u00D7 35g sachets' : '7 \u00D7 35g sachets';
@@ -1045,7 +1047,7 @@ function sachetCard(pack, title, description) {
     ? `<div class="sachet-cart-actions">${sachetCartQuantity(line)}<button type="button" class="button primary" data-action="open-cart">Go to cart</button></div>`
     : `<button type="button" class="button primary" data-action="add-sachet" data-pack="${escapeHtml(pack)}"${flavourData} ${disabled ? 'disabled' : ''}>${commerce.busy ? 'Please wait\u2026' : 'Add to cart'}</button>`;
   description = description.replace(' plus one ', ' <span class="sachet-plus" aria-hidden="true">+</span> One ');
-  return `<article class="sachet-card ${active ? 'is-selected' : ''}"><div class="sachet-card-image" data-slide-index="0"><div class="sachet-card-track">${sachetMedia(pack, title)}</div><button type="button" class="sachet-slider-control sachet-slider-prev" data-action="sachet-image-prev" aria-label="Show previous ${escapeHtml(title)} image">${icon('arrowLeft')}</button><button type="button" class="sachet-slider-control sachet-slider-next" data-action="sachet-image-next" aria-label="Show next ${escapeHtml(title)} image">${icon('arrowRight')}</button><div class="sachet-slider-dots" aria-label="Product image position"><button type="button" class="active" data-action="sachet-image-slide" data-slide="0" aria-label="Show front image" aria-pressed="true"></button><button type="button" data-action="sachet-image-slide" data-slide="1" aria-label="Show back image" aria-pressed="false"></button></div></div><div class="sachet-card-body"><p class="hero-overline">${detail}</p><h2>${title}</h2><p>${description}</p><div class="sachet-card-facts"><span>35g</span><span>24g Protein</span><span>5.7g BCAAs</span></div>${sachetFlavourPicker(pack)}<div class="sachet-price"><strong>${sachetPrice(pack, flavour)}</strong>${compare}</div><p class="sachet-stock" data-availability="${availability.state}" role="status">${availability.label}</p>${purchase}</div></article>`;
+  return `<article class="sachet-card ${active ? 'is-selected' : ''}"><div class="sachet-card-image" data-slide-index="0"><div class="sachet-card-track">${sachetMedia(pack, title)}</div><button type="button" class="sachet-slider-control sachet-slider-prev" data-action="sachet-image-prev" aria-label="Show previous ${escapeHtml(title)} image">${icon('arrowLeft')}</button><button type="button" class="sachet-slider-control sachet-slider-next" data-action="sachet-image-next" aria-label="Show next ${escapeHtml(title)} image">${icon('arrowRight')}</button><div class="sachet-slider-dots" aria-label="Product image position"><button type="button" class="active" data-action="sachet-image-slide" data-slide="0" aria-label="Show front image" aria-pressed="true"></button><button type="button" data-action="sachet-image-slide" data-slide="1" aria-label="Show back image" aria-pressed="false"></button></div></div><div class="sachet-card-body"><p class="hero-overline">${detail}</p><h2>${title}</h2><p>${description}</p><div class="sachet-card-facts"><span>35g</span><span>24g Protein</span><span>5.7g BCAAs</span></div>${sachetFlavourPicker(pack)}<div class="sachet-price${unresolved ? ' is-unresolved' : ''}" ${unresolved ? 'aria-hidden="true"' : ''}><strong>${sachetPrice(pack, flavour)}</strong>${compare}</div><p class="sachet-stock" data-availability="${availability.state}" ${availabilityAttributes}>${availability.label || '&nbsp;'}</p>${purchase}</div></article>`;
 }
 
 function sachetProductsNeedReplacement(currentSection, nextSection) {

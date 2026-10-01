@@ -97,7 +97,9 @@ test('direct Sachets load stays disabled until Shopify availability resolves', a
   run("savedSachetProduct = commerce.products.Sachets; commerce.products = {}; commerce.loading = true; commerce.cartReady = false; commerce.error = ''");
   const loading = run('shop()');
   assert.match(loading, /data-commerce-state="loading"/);
-  assert.equal((loading.match(/Checking availability/g) || []).length, 3);
+  assert.doesNotMatch(loading, /Checking availability/);
+  assert.equal((loading.match(/data-availability="loading" aria-hidden="true">&nbsp;<\/p>/g) || []).length, 3);
+  assert.equal((loading.match(/sachet-price is-unresolved" aria-hidden="true"/g) || []).length, 3);
   assert.equal((loading.match(/data-action="add-sachet"[^>]*disabled/g) || []).length, 3);
   await run("addSachetProduct('Single Sachet', 'Chocolate')");
   assert.equal(run('state.cart'), 0, 'an unresolved variant cannot bypass the disabled button');
@@ -181,6 +183,8 @@ test('Sachet disabled state is visually distinct while availability is unresolve
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
   assert.match(css, /\.sachet-card \.button:disabled\s*\{[^}]*opacity:\s*\.45[^}]*cursor:\s*not-allowed/);
   assert.match(css, /\.sachet-card \.button:disabled:hover\s*\{[^}]*transform:\s*none/);
+  assert.match(css, /\.sachet-price\.is-unresolved, \.sachet-stock\[data-availability="loading"\]\s*\{[^}]*visibility:\s*hidden/);
+  assert.match(css, /\.sachet-stock\s*\{[^}]*min-height:\s*1\.5rem/);
 });
 
 test('Storefront query requests compare-at prices and no Rewards system is introduced', () => {
