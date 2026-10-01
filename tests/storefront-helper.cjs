@@ -5,6 +5,8 @@ const root = path.resolve(__dirname, '..');
 
 function storefront() {
   const events = {};
+  const historyEntries = [{ pathname: '/', hash: '' }];
+  let historyIndex = 0;
   const storage = new Map();
   const notices = [];
   const redirects = [];
@@ -18,7 +20,14 @@ function storefront() {
     console: { warn: (...args) => notices.push(args.join(' ')) },
     fetch: () => { throw new Error('Unstubbed network call'); }
   });
-  context.history = { pushState: (_, unused, value) => { const url = new URL(value, context.location.origin); context.location.pathname = url.pathname; context.location.hash = url.hash; } };
+  const applyHistoryEntry = entry => { context.location.pathname = entry.pathname; context.location.hash = entry.hash; };
+  const historyEntry = value => { const url = new URL(value, context.location.origin); return { pathname: url.pathname, hash: url.hash }; };
+  context.history = {
+    pushState: (_, unused, value) => { historyEntries.splice(historyIndex + 1); historyEntries.push(historyEntry(value)); historyIndex += 1; applyHistoryEntry(historyEntries[historyIndex]); },
+    replaceState: (_, unused, value) => { historyEntries[historyIndex] = historyEntry(value); applyHistoryEntry(historyEntries[historyIndex]); },
+    back: () => { if (historyIndex > 0) { historyIndex -= 1; applyHistoryEntry(historyEntries[historyIndex]); events.popstate?.(); } },
+    forward: () => { if (historyIndex < historyEntries.length - 1) { historyIndex += 1; applyHistoryEntry(historyEntries[historyIndex]); events.popstate?.(); } }
+  };
   vm.runInContext(fs.readFileSync(path.join(root, 'shopify.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(root, 'batch-reports.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(root, 'app.js'), 'utf8'), context);

@@ -46,6 +46,7 @@ test('homepage renders the all-flavour customer review section', () => {
   const { run } = storefront();
   const markup = run('home()');
   assert.ok(markup.includes('data-review-scope="home"'));
+  assert.ok(markup.includes('id="home-reviews"'));
   assert.ok(markup.includes('Mawa Kulfi and Rich Chocolate'));
 });
 
@@ -56,6 +57,7 @@ test('View more reviews targets the full-page collection anchor', () => {
   const fullPage = run('reviewsPage()');
   assert.match(homeCards, /href="\/reviews#reviews-collection"/);
   assert.match(homeCards, /data-route="reviews#reviews-collection"/);
+  assert.match(homeCards, /data-home-reviews-link/);
   assert.match(fullPage, /id="reviews-collection"/);
   assert.match(fullPage, /Love from the routine/);
 });
@@ -89,7 +91,64 @@ test('every Reviews pagination action scrolls only after its page renders', () =
 
 test('Reviews collection offsets scrolling by the sticky announcement and header heights', () => {
   const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
-  assert.match(css, /#reviews-collection\s*\{[^}]*scroll-margin-top:\s*calc\(var\(--banner-h\) \+ var\(--header-h\) \+ 1rem\)/);
+  assert.match(css, /#reviews-collection,\s*#home-reviews\s*\{[^}]*scroll-margin-top:\s*calc\(var\(--banner-h\) \+ var\(--header-h\) \+ 1rem\)/);
+});
+
+test('review loading reserves card-grid space with accessible skeletons and no delay', () => {
+  const { run } = storefront();
+  const full = run("reviewLoadingState('home', { paginate: true })");
+  const home = run("reviewLoadingState('home')");
+  assert.equal((full.match(/review-card-skeleton/g) || []).length, 7);
+  assert.equal((home.match(/review-card-skeleton/g) || []).length, 3);
+  assert.match(full, /role="status"/);
+  assert.match(full, /class="sr-only">Loading reviews/);
+  assert.doesNotMatch(run('reviewLoadingState.toString()'), /setTimeout/);
+});
+
+test('successful review loading replaces skeletons immediately with review cards', async () => {
+  const { context, run } = storefront();
+  const board = { innerHTML: '' };
+  const section = { querySelector: () => board, querySelectorAll: () => [] };
+  context.document.querySelector = selector => selector === '[data-review-scope="home"]' ? section : null;
+  let finishFetch;
+  context.fetch = () => new Promise(resolve => { finishFetch = resolve; });
+  const loading = run("loadReviews('home')");
+  assert.match(board.innerHTML, /review-card-skeleton/);
+  finishFetch({ ok: true, json: async () => ({ reviews: [{ approved: true, displayName: 'Customer', rating: 5, reviewText: 'Excellent daily protein.' }] }) });
+  await loading;
+  assert.doesNotMatch(board.innerHTML, /review-card-skeleton/);
+  assert.match(board.innerHTML, /Customer/);
+});
+
+test('failed review loading removes skeletons and preserves the existing alert', async () => {
+  const { context, run } = storefront();
+  const board = { innerHTML: '' };
+  const section = { querySelector: () => board };
+  context.document.querySelector = selector => selector === '[data-review-scope="home"]' ? section : null;
+  context.fetch = async () => ({ ok: false, json: async () => ({ message: 'Reviews are temporarily unavailable.' }) });
+  await run("loadReviews('home')");
+  assert.doesNotMatch(board.innerHTML, /review-card-skeleton/);
+  assert.match(board.innerHTML, /class="review-error" role="alert"/);
+});
+
+test('browser Back and Forward restore the homepage and Reviews collection anchors', () => {
+  const { context, events, run } = storefront();
+  const targets = [];
+  context.document.getElementById = id => ({ scrollIntoView: () => targets.push(id) });
+  run("history.replaceState(null, '', '/#home-reviews'); navigate('reviews#reviews-collection')");
+  context.history.back();
+  assert.equal(run('location.pathname + location.hash'), '/#home-reviews');
+  assert.equal(targets.pop(), 'home-reviews');
+  context.history.forward();
+  assert.equal(run('location.pathname + location.hash'), '/reviews#reviews-collection');
+  assert.equal(targets.pop(), 'reviews-collection');
+  assert.equal(typeof events.popstate, 'function');
+});
+
+test('View more history refinement reuses existing delegated navigation without duplicate listeners', () => {
+  const source = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  assert.match(source, /link\.hasAttribute\('data-home-reviews-link'\) && currentRoute\(\) === 'home'\) history\.replaceState\(null, '', '\/#home-reviews'\)/);
+  assert.equal((source.match(/document\.addEventListener\('click'/g) || []).length, 2);
 });
 
 test('product reviews use compact horizontal cards with two-way controls', () => {

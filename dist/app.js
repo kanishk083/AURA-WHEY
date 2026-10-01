@@ -589,7 +589,7 @@ function home() {
   return `
     ${heroBannerCarousel()}
     <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Pick your flavour</h2><div class="gold-rule"></div></div><p>Choose the flavour that fits the ritual you want to repeat.</p></div><div class="grid product-grid">${productCard('Mawa Kulfi')}${productCard('Rich Chocolate')}</div></div></section>
-    ${reviewShowcase('home', reviewData.home || approvedReviews)}
+    ${reviewShowcase('home', reviewData.home || approvedReviews, { collectionId: 'home-reviews' })}
     <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Made for the routine</h2><div class="gold-rule"></div></div><p>Simple product details. Familiar flavours. A dependable post-training choice.</p></div><div class="image-section">${routeLink('shop', image(assets.why, 'Aura Whey athlete campaign with Mawa Kulfi and Rich Chocolate'), 'routine-banner-link')}</div><p class="button-row">${routeLink('shop', 'Shop now', 'button-link primary')}${routeLink('article/plan-your-protein-routine', 'Build your routine', 'button-link secondary')}</p></div></section>
     <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Know your pack</h2><div class="gold-rule"></div></div><p>Read the nutrition panel, check the documents, then find your batch report.</p></div><div class="grid grid-2"><div class="card label-card">${image(assets.labelMawa, 'Aura Whey Mawa Kulfi nutrition label', 'label-preview')}</div><div class="quality-cta"><h3>Quality documents and batch reports</h3><p>Our quality library keeps the supplied certification documents in one place. Check whether a third-party laboratory report is available for your batch.</p><div class="button-row">${routeLink('quality', 'Open quality library', 'button-link primary')}${routeLink('verify', 'Verify a batch', 'button-link')}</div></div></div></div></section>
     <section class="section"><div class="section-inner"><div class="section-head"><div><h2>Better-informed training</h2><div class="gold-rule"></div></div><p>Practical guides for choosing, using, and enjoying your whey protein.</p></div><div class="grid grid-3">${blogCard(0)}${blogCard(1)}${blogCard(2)}</div><p>${routeLink('blog', 'Browse the journal', 'button-link secondary')}</p></div></section>
@@ -788,7 +788,7 @@ function approvedReviewCards(reviews = approvedReviews, scope = 'product', optio
   const currentPage = paginated ? Math.min(Math.max(Number(options.page) || 1, 1), pageCount) : 1;
   const displayed = paginated ? visible.slice((currentPage - 1) * pageSize, currentPage * pageSize) : limited ? visible.slice(0, 3) : visible;
   const cards = displayed.map(review => reviewCard(review, { showDate: scope === 'home' || options.showDate })).join('');
-  const more = limited && options.showMore !== false && visible.length > 3 ? routeLink('reviews#reviews-collection', 'View more reviews', 'button-link secondary review-view-more') : '';
+  const more = limited && options.showMore !== false && visible.length > 3 ? '<a href="/reviews#reviews-collection" class="button-link secondary review-view-more" data-route="reviews#reviews-collection" data-home-reviews-link>View more reviews</a>' : '';
   const pagination = paginated && pageCount > 1 ? `<nav class="review-pagination" aria-label="Reviews pages"><button type="button" class="button" data-action="reviews-page" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>Previous</button><div class="review-page-numbers">${Array.from({ length: pageCount }, (_, index) => index + 1).map(page => `<button type="button" class="button${page === currentPage ? ' active' : ''}" data-action="reviews-page" data-page="${page}" aria-label="Go to reviews page ${page}"${page === currentPage ? ' aria-current="page"' : ''}>${page}</button>`).join('')}</div><button type="button" class="button" data-action="reviews-page" data-page="${currentPage + 1}" ${currentPage === pageCount ? 'disabled' : ''}>Next</button></nav>` : '';
   return `<div class="${className}" aria-label="${escapeHtml(label)}">${cards}</div>${pagination}${more}`;
 }
@@ -803,6 +803,13 @@ function reviewShowcase(scope = 'home', reviews = approvedReviews, options = {})
     ? `What ${escapeHtml(reviewProductLabel())} customers say \u2014 people who take their training seriously and still believe a great shake should make them smile.`
     : 'A collection of love for Mawa Kulfi and Rich Chocolate from people who take their fitness and wellbeing seriously.';
   return `<section${sectionId} class="section product-reviews review-showcase-${scope}" data-review-scope="${scope}" aria-labelledby="${titleId}"><div class="section-inner"><div class="review-heading-row"><header class="review-love-header"><p class="hero-overline">Love from the routine</p><h2 id="${titleId}">Strong routines. Big love.</h2><p>${supportingCopy}</p></header>${controls}</div><div class="review-board">${approvedReviewCards(reviews, scope, options)}${isProduct ? '<article id="review-preview" class="review-card review-preview" hidden></article>' : ''}</div></div></section>`;
+}
+
+function reviewLoadingState(scope = 'home', options = {}) {
+  const className = scope === 'product' ? 'review-card-track' : 'review-card-grid';
+  const count = options.paginate ? 7 : 3;
+  const cards = Array.from({ length: count }, () => '<article class="review-card review-card-skeleton" aria-hidden="true"><div class="review-skeleton-profile"><span class="review-skeleton-avatar"></span><span><i></i><i></i></span></div><div class="review-skeleton-stars"></div><div class="review-skeleton-copy"><i></i><i></i><i></i></div><div class="review-skeleton-badge"></div></article>').join('');
+  return `<div class="review-loading" role="status" aria-live="polite"><span class="sr-only">Loading reviews...</span><div class="${className} review-skeleton-grid" aria-hidden="true">${cards}</div></div>`;
 }
 
 function reviewsPage() {
@@ -861,7 +868,9 @@ function showSavedReview() {
 async function loadReviews(scope = 'product') {
   const url = scope === 'home' ? '/api/reviews?scope=home' : '/api/reviews?product=' + encodeURIComponent(reviewProductHandle());
   const section = document.querySelector(`[data-review-scope="${scope}"]`);
-  if (section) section.querySelector('.review-board').innerHTML = '<p class="review-loading" role="status">Loading reviews...</p>';
+  const fullReviewsPage = currentRoute() === 'reviews';
+  const options = fullReviewsPage ? { paginate: true, page: state.reviewPage, showMore: false, showDate: true } : { limit: true, showMore: true, showDate: true };
+  if (section) section.querySelector('.review-board').innerHTML = reviewLoadingState(scope, options);
   try {
     const response = await fetch(url, { headers: { Accept: 'application/json', 'X-Aura-Review-Visitor': reviewVisitorId() } });
     const result = await response.json();
@@ -872,8 +881,6 @@ async function loadReviews(scope = 'product') {
     return;
   }
   if (section) {
-    const fullReviewsPage = currentRoute() === 'reviews';
-    const options = fullReviewsPage ? { paginate: true, page: state.reviewPage, showMore: false, showDate: true } : { limit: true, showMore: true, showDate: true };
     section.querySelector('.review-board').innerHTML = approvedReviewCards(reviewData[scope], scope, options);
     bindReviewInteractions(section);
   }
@@ -1768,6 +1775,7 @@ document.addEventListener('click', event => {
   if (!views[route.split('/')[0]]) return;
   if (cartDrawerState.open) setCartDrawer(false, false);
   event.preventDefault();
+  if (link.hasAttribute('data-home-reviews-link') && currentRoute() === 'home') history.replaceState(null, '', '/#home-reviews');
   navigate(route + url.hash);
 });
 
