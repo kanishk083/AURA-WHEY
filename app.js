@@ -312,7 +312,16 @@ function deliveryPincodeCard() {
     : status === 'error' || status === 'unavailable'
       ? `<p class="delivery-result is-error" role="alert">${escapeHtml(message)}</p>`
       : saved ? `<p class="delivery-result" role="status">${escapeHtml(message || 'Pincode saved.')}</p>` : '';
-  return `<section class="summary-card"><h3 class="summary-card-title">Enter delivery pincode</h3>${saved ? `<div class="pincode-saved"><span class="pincode-mark" aria-hidden="true">${icon('mapPin')}</span><div class="pincode-details"><span class="pincode-caption">Delivering to</span><span class="pincode-value">${escapeHtml(pincode)}</span></div><button type="button" class="pincode-change" data-action="change-pincode">Change</button>${result}</div>` : `<div class="inline-action-row"><input id="summary-pincode" name="summary-pincode" inputmode="numeric" autocomplete="postal-code" maxlength="6" placeholder="Enter pincode here" aria-label="Enter delivery pincode" /><button type="button" class="button" data-action="check-pincode">Check</button></div><p class="summary-card-note">Enter your pincode to check delivery availability.</p>`}</section>`;
+  return `<section class="summary-card" data-delivery-summary><h3 class="summary-card-title">Enter delivery pincode</h3>${saved ? `<div class="pincode-saved"><span class="pincode-mark" aria-hidden="true">${icon('mapPin')}</span><div class="pincode-details"><span class="pincode-caption">Delivering to</span><span class="pincode-value">${escapeHtml(pincode)}</span></div><button type="button" class="pincode-change" data-action="change-pincode">Change</button>${result}</div>` : `<div class="inline-action-row"><input id="summary-pincode" name="summary-pincode" inputmode="numeric" autocomplete="postal-code" maxlength="6" placeholder="Enter pincode here" aria-label="Enter delivery pincode" /><button type="button" class="button" data-action="check-pincode">Check</button></div><p class="summary-card-note">Enter your pincode to check delivery availability.</p>`}</section>`;
+}
+
+function patchDeliverySummary() {
+  const current = document.querySelector('[data-delivery-summary]');
+  if (!current) return false;
+  const template = document.createElement('template');
+  template.innerHTML = deliveryPincodeCard();
+  current.replaceWith(template.content.firstElementChild);
+  return true;
 }
 
 function cartSummaryMarkup() {
@@ -1890,7 +1899,7 @@ async function handleAction(action, element) {
   }
   if (action === 'change-pincode') {
     state.delivery = { pincode: '', status: 'idle', message: '' };
-    render();
+    if (!patchDeliverySummary()) render();
     document.querySelector('#summary-pincode')?.focus();
     return;
   }
@@ -1991,13 +2000,13 @@ async function handleForm(event) {
     if (!/^\d{6}$/.test(pincode)) {
       state.delivery.status = 'error';
       state.delivery.message = 'Enter a valid 6-digit pincode.';
-      render();
+      if (!patchDeliverySummary()) render();
       document.querySelector('#delivery-pincode')?.focus();
       return;
     }
     state.delivery.status = 'checking';
     state.delivery.message = 'Checking delivery availability\u2026';
-    render();
+    if (!patchDeliverySummary()) render();
     try {
       const endpoint = window.AURA_SHIPPING_ENDPOINT || '/api/shipping/check';
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pincode, flavour: state.flavour, quantity: state.quantity, weight: 1, cod: true }) });
@@ -2011,7 +2020,7 @@ async function handleForm(event) {
         ? 'Pincode accepted. Delivery availability will be confirmed at checkout.'
         : error.message;
     }
-    render();
+    if (!patchDeliverySummary()) render();
     return;
   }
   if (form.dataset.form === 'review') {
